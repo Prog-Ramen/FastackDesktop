@@ -1,22 +1,27 @@
-const {remote} = require('electron');
-const {BrowserWindow, globalShortcut} = remote;
+const { app, BrowserWindow } = require('@electron/remote');
+const Prism = require('prismjs');
+const codeSyntaxHighlight = require('@toast-ui/editor-plugin-code-syntax-highlight/dist/toastui-editor-plugin-code-syntax-highlight-all.js');
+const remote = require('@electron/remote');
+const {globalShortcut} = remote;
 const path = require('path');
 const $ = require('jquery');
-var Editor = require('tui-editor');
+const Editor = require('@toast-ui/editor');
+const chart = require('@toast-ui/editor-plugin-chart');
+const uml = require('@toast-ui/editor-plugin-uml');
+const colorSyntax = require('@toast-ui/editor-plugin-color-syntax');
+const tableMergedCell = require('@toast-ui/editor-plugin-table-merged-cell');
 const electron = require('electron');
 const base64 = require('base-64');
 var ls = require('local-storage');
 var githubFunctions = require('../helper/github_functions');
-var {ipcRenderer} = require('electron').remote;
+var {ipcRenderer} = remote;
 var cryptoHelper = require('../helper/crypto_helper');
 var stackFunctions = require('../helper/stack_functions');
-require('tui-editor/dist/tui-editor-extChart');
-require('tui-editor/dist/tui-editor-extUML');
 
 var window = BrowserWindow.getFocusedWindow();
 
 
-$(document).ready(function () {
+app.whenReady().then(() => {
   if(ls('stack')['incomplete'].length == 0){
     $('#goBack').hide();
   } else {
@@ -29,6 +34,24 @@ $(document).ready(function () {
     $("#createTaskTitle").text("Edit Task");
     $("#submitTask").val("Submit Changes");
   }
+  var chartOptions = {      name: 'chart',
+      maxWidth: 200,
+      maxHeight: 300}
+  var editor = new Editor({
+    el: document.querySelector('#editSection'),
+    previewStyle: 'vertical',
+    initialEditType: 'markdown',
+    height: '300px',
+    toolbarItems: [],
+    autofocus: false,
+    events: {
+      change: function(evt){
+        console.log(editor.getMarkdown()); 
+        tuiWindow.webContents.send('get_data_write', editor.getMarkdown());
+      }
+    },
+    plugins: [[chart, chartOptions], [codeSyntaxHighlight, { highlighter: Prism }], colorSyntax, tableMergedCell, uml]
+  });
   createTaskInput();
   function zeroPadded(val) {
     if (val >= 10)
@@ -56,8 +79,7 @@ $(document).ready(function () {
   $('#tdate').bind('input propertychange', function () {
     console.log($('#tdate').val());
   });
-
-  let screen = electron.screen;
+  const { screen } = remote;
   let displays = screen.getAllDisplays();
   var width = 0;
   var totalDisplays = displays.length;
@@ -68,11 +90,17 @@ $(document).ready(function () {
   var tuiWindow = new BrowserWindow({
     width: 300, height: 500, show: false, frame: false,
     resizable: true,
-    hasShadow: false
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true
+    }
   });
+  remote.require("@electron/remote/main").enable(tuiWindow.webContents)
   tuiWindow.loadURL(`file://${path.join(__dirname, './tui_viewer.html')}`);
   tuiWindow.setAlwaysOnTop(true);
-  $('body').on('keydown', '.CodeMirror-focused', function(e) {
+  $('body').on('keydown', '.ProseMirror-focused', function(e) {
     if (e.which == 9) {
       e.preventDefault();
       $('#submitTask').focus();
@@ -80,17 +108,17 @@ $(document).ready(function () {
     }
   });
   setTimeout(function () {
-    $("textarea").focus(function (evt) {
+    $("div").focus(function (evt) {
       evt.preventDefault();
-      if ($(".CodeMirror-focused").length > 0) {
+      if ($(".ProseMirror-focused").length > 0) {
         tuiWindow.showInactive();
       }
 
     });
-    $("textarea").focusout(function (evt) {
+    $("div").focusout(function (evt) {
       evt.preventDefault();
       setTimeout(function () {
-        if ($(".CodeMirror-focused").length == 0) {
+        if ($(".ProseMirror-focused").length == 0) {
           tuiWindow.hide();
         }
       }, 10);
@@ -99,24 +127,6 @@ $(document).ready(function () {
   }, 10);
   remote.getCurrentWindow().show();
   tuiWindow.setPosition(remote.getCurrentWindow().getPosition()[0] - 300, remote.getCurrentWindow().getPosition()[1]);
-
-  var editor = new Editor({
-    el: document.querySelector('#editSection'),
-    previewStyle: 'tab',
-    initialEditType: 'markdown',
-    height: '300px',
-    width: '200px',
-    events: {
-      change: function(evt){
-        tuiWindow.webContents.send('get_data_write', editor.getValue());
-      }
-    },
-    exts: ['scrollSync', 'uml', {
-      name: 'chart',
-      maxWidth: 200,
-      maxHeight: 300
-    }, 'mark', 'table', 'taskCounter']
-  });
   $('#dates').on('change', function() {
     if ( $("#dates").prop("checked")) {
       $("#start").show();
@@ -256,4 +266,5 @@ $(document).ready(function () {
     }
     });
   }
+  $('#tname').focus();
 });

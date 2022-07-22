@@ -1,5 +1,6 @@
-const {remote} = require('electron');
-const {BrowserWindow, globalShortcut} = remote;
+const {globalShortcut} = remote;
+const { BrowserWindow } = require('@electron/remote');
+const remote = require('@electron/remote');
 const path = require('path');
 const $ = require('jquery');
 var Editor = require('tui-editor');

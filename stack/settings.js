@@ -12,9 +12,11 @@ function updateSettings(callback){
 }
 
 function getCreateSettings(callback) {
-  githubFunctions.checkFileExists(ls('token'), ls('username'), ls('repoName'), "settings", function (err, contentArray) {
-    if (err == null && contentArray === "") {
-      githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), "settings", JSON.stringify(settings), function (err, result) {
+  githubFunctions.checkFileExists(ls('token'), ls('username'), ls('repoName'), "fastack_settings", function (err, contentArray) {
+    console.log(err);
+    console.log(contentArray);
+    if (err == null && contentArray.length === 0) {
+      githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), "fastack_settings", JSON.stringify(settings), function (err, result) {
         if (err) {
           $('#errorreponame').text("Cannot create a settings file in the repository: " + err.message);
           return callback(err.message, null)
@@ -23,12 +25,13 @@ function getCreateSettings(callback) {
         }
       });
     } else {
-      githubFunctions.getContent(ls('token'), ls('username'), "settings", ls('repoName'), function (err, settingsResults) {
+      githubFunctions.getContent(ls('token'), ls('username'), "fastack_settings", ls('repoName'), function (err, settingsResults) {
         if (err) {
           $('#errorreponame').text("Cannot get a settings file from the repository: " + err.message);
           return callback(err.message, null);
         } else {
-          return callback(null, JSON.parse(atob(settingsResults['content'])));
+	  console.log(settingsResults['content']);
+          return callback(null, JSON.parse(atob(settingsResults['content'].replace(/[^A-Za-z0-9+]/g, ""))));
         }
       });
     }

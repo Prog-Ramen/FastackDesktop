@@ -1,7 +1,7 @@
-const {remote} = require('electron');
+const remote = require('@electron/remote');
 const {BrowserWindow, globalShortcut} = remote;
 const electron = require('electron');;
-var {ipcRenderer} = require('electron').remote;
+var {ipcRenderer} = remote;
 const {desktopCapturer, screen} = require('electron');
 const Tesseract = require('tesseract.js');
 var window = BrowserWindow.getFocusedWindow();

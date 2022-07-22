@@ -1,6 +1,6 @@
 
-const { remote } = require('electron');
-const { BrowserWindow } = remote;
+const { BrowserWindow } = require('@electron/remote');
+const remote = require('@electron/remote');
 const path = require('path')
 var $ = require('jquery');
 const electron = require('electron');
@@ -96,11 +96,8 @@ $(document).ready(function () {
         var password = $('#stackpass').val();
         if (!ls("repoName")){
           githubFunctions.getPlan(ls('token'), function (err, plan) {
-            if (plan.hasOwnProperty('private_repos')) {
-              var privateRepo = false;
-              if (plan.private_repos > 0) {
-                privateRepo = true;
-              }
+            if (true) {
+              privateRepo = true;
               githubFunctions.makeRepo(ls('token'), repoName, privateRepo, function (err, result) {
                 if (err) {
                   errorLog("Repository creation failed: Ensure a repository with the same name does not exist.");
@@ -126,7 +123,7 @@ $(document).ready(function () {
                       ls('key', password);
                       ls('repoName', repoName);
                       ls('createPage', 'add');
-                      window.location.replace("./createTask.html");
+                      //window.location.replace("./createTask.html");
                     }
                   });
                 }
@@ -147,9 +144,9 @@ $(document).ready(function () {
               ls('stack', stackValue?stackValue:{'complete': [], 'incomplete': []});
               if (ls('stack')['incomplete'].length === 0) {
                 ls('createPage', 'add');
-                window.location.replace("./createTask.html");
+                //window.location.replace("./createTask.html");
               } else {
-                window.location.replace("./stack.html");
+                //window.location.replace("./stack.html");
               }
             });
           } else {
