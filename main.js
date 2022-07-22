@@ -1,6 +1,6 @@
 const {app, BrowserWindow, ipcMain, Tray, nativeImage} = require('electron')
 const path = require('path')
-
+require('@electron/remote/main').initialize()
 
 const assetsDir = path.join(__dirname, 'assets')
 
@@ -50,9 +50,12 @@ app.on('ready', () => {
     transparent: true,
     hasShadow: false,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true
     }
   });
+  require('@electron/remote/main').enable(window.webContents);
   // Tell the popup window to load our loginGithub.html file
   window.loadURL(`file://${path.join(__dirname, './home.html')}`);
 

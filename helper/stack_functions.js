@@ -75,7 +75,6 @@ var encryptItem = exports.encryptItem = function(task, key){
 }
 
 exports.generateTranslate = function(stack_length, index, current) {
-    console.log(current);
     var height = 85/(stack_length-1);
     var overhead = -40/(stack_length-1);
     if (stack_length == 1){
@@ -89,7 +88,6 @@ exports.generateTranslate = function(stack_length, index, current) {
     var actualH = index!=current?"height: " + height + "%;":"height: 50%;";
     translate = translate+actualH;
     translate = translate + ` z-index: ${index<current?(stack_length+index-current):(stack_length-index+current)};`;
-    console.log(translate);
     overhead = overhead + 2/(stack_length-1);
     return [translate, overhead];
 }
@@ -141,7 +139,7 @@ exports.generateTaskHTML = function(index, translate, decrypted,overhead, status
     } else {
         color = "#FFD700;";
     }
-    return '<div id="t' + index + '" class="task taskName" style="background: ' + color + translate + '">' +
+    return `<div id="t${index}" class="task taskName" style="background: ${color}${translate}; opacity: ${index != current?1/(Math.abs(current-index)+1):0.9}">` +
             `<table align="center" ${index>current?"style='position:absolute; top: "+ -overhead*1.1+"vh;'":""}>
             <tr>
               <th><h2 class="header">${decrypted['taskName']}</h2></th>

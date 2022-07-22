@@ -13,7 +13,7 @@ body * {
     -webkit-app-region:drag;
 }
 
-.CodeMirror-cursor {
+.ProseMirror-cursor {
     height: 16px!important;
 }
 
@@ -34,6 +34,14 @@ src: url(../fonts/OpenSans-Semibold.ttf);
     
 ::-webkit-scrollbar {
     display: none;
+}
+
+.toastui-editor-md-container {
+    background: rgba(255,255,255, 0.1);
+}
+
+.toastui-editor-pseudo-clipboard {
+	display: none;
 }
 
 
@@ -107,6 +115,7 @@ hr {
     display: block!important;
     margin: 0 auto;
     width: 100%;
+    height: 100%;
 }
 
 
@@ -345,24 +354,6 @@ input[type=number] {
     -webkit-app-region:no-drag;
 }
 
-.te-editor {
-    background: rgba(255,255,255,0.1);
-}
-
-.tui-editor {
-    height: 100%!important;
-}
-
-:not(.auto-height) > .tui-editor-defaultUI,
-:not(.auto-height) > .tui-editor-defaultUI > .te-editor-section {
-    border: 0!important;
-}
-
-.te-editor-section {
-    height:100%!important;
-}
-
-
 .tui-editor-defaultUI-toolbar {
     opacity: 0!important;
     pointer-events:none!important;
@@ -370,12 +361,9 @@ input[type=number] {
     display: none!important;
 }
 
-.tui-popup-body {
-    width: 200px;
-}
-
-.CodeMirror {
-    background: transparent!important;
+.ProseMirror {
+    height: 100%;
+    overflow: scroll;
 }
 
 .text {
@@ -386,14 +374,22 @@ input[type=number] {
     z-index: 1000000!important;
 }
 
-.te-preview {
-    background-color: rgba(255,255,255, 0.3);!important;
+.toastui-editor-md-preview {
+    display: none!important;
 }
 
 .te-mode-switch-section {
     display: none!important;
 }
-.te-toolbar-section{
+.toastui-editor-toolbar {
+    display: none !important;
+}
+
+.toastui-editor-mode-switch {
+    display: none!important;
+}
+
+.toastui-editor-toolbar .te-toolbar-section{
     display: none!important;
 }
 
@@ -426,10 +422,6 @@ input.invalid {
 }
 #editSectionViewer *{
     -webkit-app-region:no-drag!important;
-}
-
-.te-toolbar-section {
-    background-color: rgba(255,255,255,0.9)!important;
 }
 
 button {

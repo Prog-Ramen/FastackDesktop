@@ -83,7 +83,7 @@ h3{
 
 /* Start of framework code */
 *,*::after,*::before{box-sizing:border-box}
-.container{display:flex;flex-direction:column}
+.container{display:flex;flex-direction:column; height: 100%;}
 .stack,.panel{display:block; position:static;}
 .stack{flex-direction:column}
 /* End of framework code */
@@ -130,6 +130,7 @@ body
 
 .s1
 {
+  height: 100%;
   position: relative;
   background: transparent;
 }

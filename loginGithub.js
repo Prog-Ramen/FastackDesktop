@@ -1,6 +1,7 @@
 
-const { remote, shell} = require('electron');
-const { BrowserWindow } = remote;
+const { shell } = require('electron');
+const { BrowserWindow } = require('@electron/remote');
+const remote = require('@electron/remote');
 const path = require('path');
 const $ = require('jquery');
 const electron = require('electron');
@@ -33,7 +34,7 @@ $(document).ready(function() {
         ls('platform', buttonType);
         if (buttonType === "Github") {
           authorization_url = 'https://github.com/login/oauth/authorize?';
-          authorization_url = authorization_url + 'client_id=' + ls('GITHUB_CLIENT_ID');
+          authorization_url = authorization_url + 'client_id=' + ls('GITHUB_CLIENT_ID') + "&scope=repo";
         } else if (buttonType === "Dropbox") {
           authorization_url = "https://www.dropbox.com/oauth2/authorize?";
           TOKEN_URL = "https://fastack.herokuapp.com/dropbox/authenticate?code=";
@@ -108,6 +109,7 @@ $(document).ready(function() {
           ls("username", username);
           ls('repoName', "");
           githubFunctions.checkFastackRepoExists(ls('token'), ls('username'), function(err, result){
+            console.log(result);
             if (result[0]){
               ls('encstackdata', true);
               console.log(result[0]);
@@ -132,6 +134,7 @@ $(document).ready(function() {
                 
               }
             } else {
+              console.log("SWITCHING");
               ls("reponame", "");
               ls("encstackdata", false);
               ls("stackpass", "");
@@ -144,18 +147,18 @@ $(document).ready(function() {
 
 
 
-    function handleCallback (url) {
+    function handleCallback (url, window) {
       console.log(url);
       var raw_code = /code=([^&]*)/.exec(url) || null;
       var code = (raw_code && raw_code.length > 1) ? raw_code[1] : null;
       var error = /\?error=(.+)$/.exec(url);
       console.log(code);
 
-      loggedIn = true;
       // If there is a code, proceed to get token from github
       if (code) {
         getToken(code, function(result){
-
+         loggedIn = true;
+	 window.hide();
          setTokenAndChangePage(result)
         });
         return;
@@ -167,7 +170,9 @@ $(document).ready(function() {
     }
 
     function getToken(code, callback){
+      console.log(code);
       $.getJSON(TOKEN_URL+code, function(data) {
+	console.log(data);
         if (data.token){
           return callback(data.token);
         } else {
@@ -180,9 +185,15 @@ $(document).ready(function() {
     // Handle the response from GitHub
     function runOAuthWindowFunctions(window){
       var loggedIn = false;
-      window.webContents.on('will-navigate', function (event, url) {
-        window.hide();
-        loggedIn = true;
+
+      window.webContents.on('did-redirect-navigation', function (event, oldUrl, newUrl) {
+        //console.log(newUrl);
+        //handleCallback(newUrl);
+      });
+
+      window.webContents.on('did-finish-load',function(event, url){
+	//window.hide();
+	url = event.sender.getURL();
         if (url.includes("google")){
           //var authWindow = new BrowserWindow({width: 800, height: 800, show: false, 'node-integration': false});
           window.loadURL(url);
@@ -190,18 +201,10 @@ $(document).ready(function() {
           runOAuthWindowFunctions(window);
           //authWindow.show();
         } else {
-          handleCallback(url);
+	  handleCallback(url, window);
         }
 
-      });
 
-      window.webContents.on('did-get-redirect-request', function (event, oldUrl, newUrl) {
-        console.log(newUrl);
-        handleCallback(newUrl);
-      });
-
-      window.webContents.on('did-finish-load',function(event, url){
-        console.log(url);
       });
 
       // Reset the authWindow on close

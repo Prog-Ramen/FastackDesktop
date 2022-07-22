@@ -110,20 +110,23 @@ exports.getContent = function(token, username, filepath, repoName, callback){
   }).then((response) => {
     const isValid = response.status < 400;
     const body = response._bodyInit;
-    return response.json().then((json) => {
+    console.log(response.status);
+    response.json().then((json) => {
       console.log(json);
       if (isValid) {
         json['repoName'] = repoName;
         return callback(null, json);
       } else {
-        return callback(json.message, null);
+        return callback(null, []);
       }
     });
+  }).catch((error) => {
+      return callback(null, []);
   });
 }
 
 exports.checkFastackRepoExists = function(token, username, callback){
-  fetch("https://api.github.com/user/repos?affiliation=owner", {
+  fetch("https://api.github.com/user/repos?affiliation=owner&per_page=100", {
     method: 'GET',
     headers: {
       'Authorization' : 'token ' + token,
@@ -141,9 +144,14 @@ exports.checkFastackRepoExists = function(token, username, callback){
           var temp = this;
           var found = false;
           async.map(nameArray, async.apply(this.getContent, token, username, ""), function(err, contentArray){
+            console.log(contentArray.length);
+	
             for (var repoCount = 0; repoCount < contentArray.length; repoCount++){
-              console.log(contentArray);
-              for (var fileCount = 0; fileCount < contentArray[repoCount].length; fileCount++) {
+	      num_files = 0;
+	      if (contentArray[repoCount]) {
+                  num_files = contentArray[repoCount].length;
+              } 
+              for (var fileCount = 0; fileCount < num_files; fileCount++) {
                 if (contentArray[repoCount][fileCount].name === username) {
                   found = true;
                   temp.getContent(token, username, username, json[repoCount].name, function(err, contentInfo){
@@ -170,7 +178,7 @@ exports.checkFileExists = function(token, username, repoName, filename, callback
   this.getContent(token, username, filename, repoName, function(err, contentArray){
     if (err){
       console.log(err);
-      return callback(null, "");
+      return callback(null, []);
     }
     return callback(null, contentArray);
   });
