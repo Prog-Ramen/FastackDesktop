@@ -2,7 +2,7 @@ const { app, BrowserWindow } = require('@electron/remote');
 const Prism = require('prismjs');
 const codeSyntaxHighlight = require('@toast-ui/editor-plugin-code-syntax-highlight/dist/toastui-editor-plugin-code-syntax-highlight-all.js');
 const remote = require('@electron/remote');
-const {globalShortcut} = remote;
+const { globalShortcut } = remote;
 const path = require('path');
 const $ = require('jquery');
 const Editor = require('@toast-ui/editor');
@@ -14,7 +14,10 @@ const electron = require('electron');
 const base64 = require('base-64');
 var ls = require('local-storage');
 var githubFunctions = require('../helper/github_functions');
-var {ipcRenderer} = remote;
+var dropboxFunctions = require('../helper/dropbox_functions');
+var gdriveFunctions = require('../helper/gdrive_functions');
+var localFunctions = require('../helper/local_functions');
+var { ipcRenderer } = remote;
 var cryptoHelper = require('../helper/crypto_helper');
 var stackFunctions = require('../helper/stack_functions');
 
@@ -22,21 +25,23 @@ var window = BrowserWindow.getFocusedWindow();
 
 
 app.whenReady().then(() => {
-  if(ls('stack')['incomplete'].length == 0){
+  if (ls('stack')['incomplete'].length == 0) {
     $('#goBack').hide();
   } else {
     $('#goBack').show();
   }
-  $('#goBack').click(function(){
+  $('#goBack').click(function () {
     window.location.replace('./stack.html');
   })
-  if (ls('createPage') == "edit"){
+  if (ls('createPage') == "edit") {
     $("#createTaskTitle").text("Edit Task");
     $("#submitTask").val("Submit Changes");
   }
-  var chartOptions = {      name: 'chart',
-      maxWidth: 200,
-      maxHeight: 300}
+  var chartOptions = {
+    name: 'chart',
+    maxWidth: 200,
+    maxHeight: 300
+  }
   var editor = new Editor({
     el: document.querySelector('#editSection'),
     previewStyle: 'vertical',
@@ -45,8 +50,8 @@ app.whenReady().then(() => {
     toolbarItems: [],
     autofocus: false,
     events: {
-      change: function(evt){
-        console.log(editor.getMarkdown()); 
+      change: function (evt) {
+        console.log(editor.getMarkdown());
         tuiWindow.webContents.send('get_data_write', editor.getMarkdown());
       }
     },
@@ -62,9 +67,9 @@ app.whenReady().then(() => {
   $("body").css("background-color", "transparent");
   $("ul li:nth-child(2)").append("<span> - 2nd!</span>");
 
-  
 
-  
+
+
   function fixStepIndicator(n) {
     // This function removes the "active" class of all steps...
     var i, x = document.getElementsByClassName("step");
@@ -100,7 +105,7 @@ app.whenReady().then(() => {
   remote.require("@electron/remote/main").enable(tuiWindow.webContents)
   tuiWindow.loadURL(`file://${path.join(__dirname, './tui_viewer.html')}`);
   tuiWindow.setAlwaysOnTop(true);
-  $('body').on('keydown', '.ProseMirror-focused', function(e) {
+  $('body').on('keydown', '.ProseMirror-focused', function (e) {
     if (e.which == 9) {
       e.preventDefault();
       $('#submitTask').focus();
@@ -127,8 +132,8 @@ app.whenReady().then(() => {
   }, 10);
   remote.getCurrentWindow().show();
   tuiWindow.setPosition(remote.getCurrentWindow().getPosition()[0] - 300, remote.getCurrentWindow().getPosition()[1]);
-  $('#dates').on('change', function() {
-    if ( $("#dates").prop("checked")) {
+  $('#dates').on('change', function () {
+    if ($("#dates").prop("checked")) {
       $("#start").show();
       $("#comp").show();
     } else {
@@ -136,57 +141,57 @@ app.whenReady().then(() => {
       $("#comp").hide();
     }
   });
- 
-  function createTaskInput(){
+
+  function createTaskInput() {
     var d = new Date();
-    var dateString = d.getFullYear()+"-"+zeroPadded(d.getMonth() + 1)+"-"+zeroPadded(d.getDate())+"T"+zeroPadded(d.getHours())+":"+zeroPadded(d.getMinutes());
+    var dateString = d.getFullYear() + "-" + zeroPadded(d.getMonth() + 1) + "-" + zeroPadded(d.getDate()) + "T" + zeroPadded(d.getHours()) + ":" + zeroPadded(d.getMinutes());
     d = new Date(dateString);
     $("#startDate").val(dateString);
     $("#compDate").val(dateString);
-    $('#tname').on('input', function(){
+    $('#tname').on('input', function () {
       $("#nameError").html("<br><br>");
-      if ($('#tname').val() == ""){
+      if ($('#tname').val() == "") {
         $("#nameError").html("Error: Task name is required.");
       }
     });
-    $('#hours, #minutes').on('input', function(){
-      $("#timeError").html("<br><br>");            
+    $('#hours, #minutes').on('input', function () {
+      $("#timeError").html("<br><br>");
       var testHours = parseInt($('#hours').val());
       var testMins = parseInt($('#minutes').val());
-      if (testHours < 0 || testHours > 1000 || !/\d/.test($("#hours").val()) || testMins < 0 || testMins > 59 || !/\d/.test($("#minutes").val())){
+      if (testHours < 0 || testHours > 1000 || !/\d/.test($("#hours").val()) || testMins < 0 || testMins > 59 || !/\d/.test($("#minutes").val())) {
         $("#timeError").html("Error: hours need to be between 0 and 1000 and minutes between 0 and 59");
       }
     });
-    $('#priority').on('input', function(){
+    $('#priority').on('input', function () {
       $("#priorityError").html("<br><br>");
       var testPri = parseInt($('#priority').val());
-      if (testPri < 1 || testPri > 100 || !/\d/.test($("#priority").val())){
+      if (testPri < 1 || testPri > 100 || !/\d/.test($("#priority").val())) {
         $("#priorityError").html("Error: priority needs to be between 1 and 100.");
       }
     });
-    $('#startDate').on('input', function(){
+    $('#startDate').on('input', function () {
       $("#startError").html("<br><br>");
       $("#compError").html("<br><br>");
       var testDate = new Date($('#startDate').val()).getTime();
       var compDate = new Date($('#compDate').val()).getTime();
-      if (compDate/1000/60 < testDate/1000/60) {
+      if (compDate / 1000 / 60 < testDate / 1000 / 60) {
         $("#compError").html("Error: task completion date cannot be earlier than the start date.");
       }
     });
 
-    
-    $('#compDate').on('input', function(){
+
+    $('#compDate').on('input', function () {
       $("#compError").html("<br><br>");
       var testDate = new Date($('#startDate').val()).getTime();
       var compDate = new Date($('#compDate').val()).getTime();
-      if (compDate/1000/60 < testDate/1000/60) {
+      if (compDate / 1000 / 60 < testDate / 1000 / 60) {
         $("#compError").html("Error: task completion date cannot be earlier than the start date.");
       }
     });
-    $('#tags').on('input', function(){
+    $('#tags').on('input', function () {
       $("#tagError").html("<br><br>");
       var test = $('#tags').val();
-      if (!/^(#[a-z0-9]+\,[\s]*)*(#[a-z0-9]+[\s]*){0,1}$/gi.test(test)){
+      if (!/^(#[a-z0-9]+\,[\s]*)*(#[a-z0-9]+[\s]*){0,1}$/gi.test(test)) {
         $("#tagError").html("Error: Tags should be formatted as follows \"#tag1, #tag2, #tag3\".");
       }
     });
@@ -194,76 +199,86 @@ app.whenReady().then(() => {
     $('#createNewTask').on('submit', function (evt) {
       evt.preventDefault();
       var buttonType = $("input[type=submit][clicked=true]").val();
-      
+
       if (buttonType != "Go Back") {
-      var d = new Date();
-      var dateString = d.getFullYear()+"-"+zeroPadded(d.getMonth() + 1)+"-"+zeroPadded(d.getDate())+"T"+zeroPadded(d.getHours())+":"+zeroPadded(d.getMinutes());
-      d = new Date(dateString);
-      evt.preventDefault();
-      var taskName = $("#tname").val();
-      var startDate = $("#startDate").val();
-      var completionDate = $("#compDate").val();
-      var timeHours = parseInt($("#hours").val());
-      var timeMins = parseInt($("#minutes").val());
-      var priority = parseInt($("#priority").val());
-      var description = $("#description").val(); 
-      var tags = $("#tags").val();
-      var notes = $("textarea")[1].value; 
-      var complete = false;
-      $("#startError").html("<br><br>"); 
-      $("#compError").html("<br><br>");
-      var testDate = new Date($('#startDate').val()).getTime();
-      var creationDate = dateString;
-      var compDate = new Date($('#compDate').val()).getTime();
-      $("#error").html("<br><br>");
-      var count = 0;
-      if (taskName == ""){
-        var nameError = "Error: Task name is required.";
-        $("#nameError").html(nameError);
-        count++;
-      }
-      if (timeHours < 0 || timeHours > 1000 || !/\d/.test($("#hours").val()) || timeMins < 0 || timeMins > 59 || !/\d/.test($("#minutes").val())){
-        var timeError = "Error: hours need to be between 0 and 1000 and minutes between 0 and 59";
-        $("#timeError").html(timeError);
-        count++;
-      }
-      if (priority < 1 || priority > 100 || !/\d/.test($("#priority").val())){
-        var priError = "Error: priority needs to be between 1 and 100.";
-        $("#priorityError").html(priError);
-        count++;
-      }
-      if (!/^(#[a-z0-9]+\,[\s]*)*(#[a-z0-9]+[\s]*){0,1}$/gi.test(tags)){
-        var tagError = "Error: Tags should be formatted as follows \"#tag1, #tag2, #tag3\".";
-        $("#tagError").html(tagError);
-        count++;
-      }
-      if (compDate/1000/60 < testDate/1000/60) {
-        $("#compError").html("Error: task completion date cannot be earlier than the start date.");
-        count++;
-      }
-      var ignoreDates = false;
-      if (!$("#dates").prop("checked")){
-        ignoreDates = true;
-      }
-      if (count > 0){
-        $("#error").html("Invalid entries were found that need to be fixed before proceeding.");
-      } else {
-        var stack = ls('stack')['incomplete'];
-        if (ls('createPage') == "add"){
-          var timeTaken = 0;
-          stack.push(stackFunctions.encryptTask(stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete)));
-        } else {
-          var timeTaken = parseInt(stackFunctions.decryptItem(stack[ls('currIndex')], 'timeTaken'));
-          stack[ls('currIndex')] = stackFunctions.encryptTask(stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete)); 
+        var d = new Date();
+        var dateString = d.getFullYear() + "-" + zeroPadded(d.getMonth() + 1) + "-" + zeroPadded(d.getDate()) + "T" + zeroPadded(d.getHours()) + ":" + zeroPadded(d.getMinutes());
+        d = new Date(dateString);
+        evt.preventDefault();
+        var taskName = $("#tname").val();
+        var startDate = $("#startDate").val();
+        var completionDate = $("#compDate").val();
+        var timeHours = parseInt($("#hours").val());
+        var timeMins = parseInt($("#minutes").val());
+        var priority = parseInt($("#priority").val());
+        var description = $("#description").val();
+        var tags = $("#tags").val();
+        var notes = $("textarea")[1].value;
+        var complete = false;
+        $("#startError").html("<br><br>");
+        $("#compError").html("<br><br>");
+        var testDate = new Date($('#startDate').val()).getTime();
+        var creationDate = dateString;
+        var compDate = new Date($('#compDate').val()).getTime();
+        $("#error").html("<br><br>");
+        var count = 0;
+        if (taskName == "") {
+          var nameError = "Error: Task name is required.";
+          $("#nameError").html(nameError);
+          count++;
         }
-        
-        ls('stack', {'incomplete': stack, 'complete': ls('stack')['complete']});
-        stackFunctions.stackSort();
-        githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate(), JSON.stringify(ls('stack')));
-        window.location.replace("./stack.html");
+        if (timeHours < 0 || timeHours > 1000 || !/\d/.test($("#hours").val()) || timeMins < 0 || timeMins > 59 || !/\d/.test($("#minutes").val())) {
+          var timeError = "Error: hours need to be between 0 and 1000 and minutes between 0 and 59";
+          $("#timeError").html(timeError);
+          count++;
+        }
+        if (priority < 1 || priority > 100 || !/\d/.test($("#priority").val())) {
+          var priError = "Error: priority needs to be between 1 and 100.";
+          $("#priorityError").html(priError);
+          count++;
+        }
+        if (!/^(#[a-z0-9]+\,[\s]*)*(#[a-z0-9]+[\s]*){0,1}$/gi.test(tags)) {
+          var tagError = "Error: Tags should be formatted as follows \"#tag1, #tag2, #tag3\".";
+          $("#tagError").html(tagError);
+          count++;
+        }
+        if (compDate / 1000 / 60 < testDate / 1000 / 60) {
+          $("#compError").html("Error: task completion date cannot be earlier than the start date.");
+          count++;
+        }
+        var ignoreDates = false;
+        if (!$("#dates").prop("checked")) {
+          ignoreDates = true;
+        }
+        if (count > 0) {
+          $("#error").html("Invalid entries were found that need to be fixed before proceeding.");
+        } else {
+          var stack = ls('stack')['incomplete'];
+          if (ls('createPage') == "add") {
+            var timeTaken = 0;
+            stack.push(stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete));
+          } else {
+            var timeTaken = parseInt(stack[ls('currIndex')].timeTaken, 10) || 0;
+            stack[ls('currIndex')] = stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete);
+          }
+
+          ls('stack', { 'incomplete': stack, 'complete': ls('stack')['complete'] });
+          stackFunctions.stackSort();
+          var datePath = d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate();
+          var stackJson = JSON.stringify(ls('stack'));
+          var onWrite = function (err) { if (err) { console.log(err); } };
+          if (ls('platform') === "Github") {
+            githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), datePath, stackJson, onWrite);
+          } else if (ls('platform') === "Dropbox") {
+            dropboxFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
+          } else if (ls('platform') === "Google") {
+            gdriveFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
+          } else if (ls('platform') === "Local") {
+            localFunctions.createUpdateFile("", ls('repoName') + "/" + datePath, stackJson, onWrite);
+          }
+          window.location.replace("./stack.html");
+        }
       }
-      //window.location.replace("./stack.html");
-    }
     });
   }
   $('#tname').focus();

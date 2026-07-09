@@ -22,17 +22,21 @@ function createNewGithub(token){
 }
 
 
+function ghAuth(token) {
+  return 'Bearer ' + token;
+}
+
 exports.makeRepo = function(token, repoName, privateRepos, callback){
   fetch("https://api.github.com/user/repos", {
     method: 'POST',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
+      'Accept': 'application/vnd.github+json'
     },
     body: JSON.stringify({
       'name': repoName,
       'auto_init': true,
-      'private': privateRepos,
-      'gitignore_template': 'nanoc'
+      'private': privateRepos
     })
   })
     .then((response) => {
@@ -54,7 +58,7 @@ exports.getPlan = function(token, callback){
   fetch("https://api.github.com/user", {
     method: 'GET',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
     }
   })
     .then((response) => {
@@ -105,7 +109,7 @@ exports.getContent = function(token, username, filepath, repoName, callback){
   fetch("https://api.github.com/repos/" + username + "/" + repoName + "/contents/" + filepath, {
     method: 'GET',
     headers: {
-      'Authorization': 'token ' + token,
+      'Authorization': ghAuth(token),
     }
   }).then((response) => {
     const isValid = response.status < 400;
@@ -129,7 +133,7 @@ exports.checkFastackRepoExists = function(token, username, callback){
   fetch("https://api.github.com/user/repos?affiliation=owner&per_page=100", {
     method: 'GET',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
       'affiliation': 'owner'
     }
   })
@@ -144,28 +148,19 @@ exports.checkFastackRepoExists = function(token, username, callback){
           var temp = this;
           var found = false;
           async.map(nameArray, async.apply(this.getContent, token, username, ""), function(err, contentArray){
-            console.log(contentArray.length);
-	
             for (var repoCount = 0; repoCount < contentArray.length; repoCount++){
-	      num_files = 0;
-	      if (contentArray[repoCount]) {
-                  num_files = contentArray[repoCount].length;
-              } 
+              var num_files = 0;
+              if (contentArray[repoCount] && contentArray[repoCount].length) {
+                num_files = contentArray[repoCount].length;
+              }
               for (var fileCount = 0; fileCount < num_files; fileCount++) {
-                if (contentArray[repoCount][fileCount].name === username) {
-                  found = true;
-                  temp.getContent(token, username, username, json[repoCount].name, function(err, contentInfo){
-                    if (err){
-                      return callback('Unable to get file contents.', null);
-                    }
-                    return callback(null, [contentInfo['repoName'], contentInfo['content']]);
-                  });
-                } else if (repoCount === contentArray.length - 1 && fileCount === contentArray[repoCount].length - 1 && found === false){
-                  console.log(found);
-                  return callback(null, ["", ""]);
+                var filename_regex = new RegExp("fastack-\\d+-" + username);
+                if (filename_regex.test(contentArray[repoCount][fileCount].name)) {
+                  return callback(null, [json[repoCount].name, null]);
                 }
               }
             }
+            return callback(null, ["", ""]);
           });
         } else {
           return callback(json.message, null);
@@ -206,7 +201,7 @@ exports.createUpdateFile = function(token, username, repoName, filename, fileCon
           'message': filename
         }
       };
-      if (exists){
+      if (exists && exists.sha) {
         options['body']['sha'] = exists.sha;
       }
       options['body'] = JSON.stringify(options['body']);

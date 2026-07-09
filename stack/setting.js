@@ -1,6 +1,29 @@
 var isAccelerator = require("electron-is-accelerator");
 
 $(document).ready(function () {
+    // Show "Push to Cloud" only in Local mode.
+    if (ls('platform') === 'Local') {
+        $('#syncSection').show();
+        function startMigration(target) {
+            var repoInput = ($('#syncRepoName').val() || '').trim();
+            var reRepo = /^[A-Za-z0-9_.-]+$/;
+            if (!repoInput) {
+                $('#syncStatus').text('Enter a cloud repo/folder name first.');
+                return;
+            }
+            if (!reRepo.test(repoInput)) {
+                $('#syncStatus').text('Name can only contain letters, digits, _ . -');
+                return;
+            }
+            ls('migrateTarget', target);
+            ls('migrateRepoName', repoInput);
+            $('#syncStatus').text('Opening ' + target + ' auth...');
+            window.location.replace('../home.html?migrate=' + encodeURIComponent(target));
+        }
+        $('#syncGithub').on('click', function () { startMigration('Github'); });
+        $('#syncDropbox').on('click', function () { startMigration('Dropbox'); });
+        $('#syncGoogle').on('click', function () { startMigration('Google'); });
+    }
     function keyDown(shortcut) {
         return function curried_func(e) {
             var settings = ls('settings');

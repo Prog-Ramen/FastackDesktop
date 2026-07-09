@@ -1,4 +1,4 @@
-const {app, BrowserWindow, ipcMain, Tray, nativeImage} = require('electron')
+const { app, BrowserWindow, ipcMain, Tray, nativeImage } = require('electron')
 const path = require('path')
 require('@electron/remote/main').initialize()
 
@@ -6,16 +6,17 @@ const assetsDir = path.join(__dirname, 'assets')
 
 let tray = undefined
 let window = undefined
-
-// This method is called once Electron is ready to run our code
-// It is effectively the main method of our Electron app
-require('electron-context-menu')({
+function start_context() {
+  // This method is called once Electron is ready to run our code
+  // It is effectively the main method of our Electron app
+  require('electron-context-menu')({
     prepend: (params, browserWindow) => [{
-    label: 'Rainbow',
-    // Only show it when right-clicking images
-    visible: params.mediaType === 'image'
+      label: 'Rainbow',
+      // Only show it when right-clicking images
+      visible: params.mediaType === 'image'
     }]
-});
+  });
+}
 
 app.on('ready', () => {
 
@@ -31,12 +32,12 @@ app.on('ready', () => {
   // Add a click handler so that when the user clicks on the menubar icon, it shows
   // our popup window
   var first = 0;
-  tray.on('click', function(event) {
+  tray.on('click', function (event) {
     toggleWindow();
 
     // Show devtools when command clicked
     if (window.isVisible() && process.defaultApp && event.metaKey) {
-      window.openDevTools({mode: 'detach'})
+      window.openDevTools({ mode: 'detach' })
     }
   });
 
@@ -55,13 +56,22 @@ app.on('ready', () => {
       enableRemoteModule: true
     }
   });
+  if (process.env.FASTACK_DEV === '1' || !app.isPackaged) {
+    // Only open devtools automatically during development.
+    // Set FASTACK_DEV=0 to suppress even when running unpackaged.
+    if (process.env.FASTACK_DEV !== '0') {
+      window.webContents.openDevTools({ mode: 'detach' });
+    }
+  }
   require('@electron/remote/main').enable(window.webContents);
-  // Tell the popup window to load our loginGithub.html file
-  window.loadURL(`file://${path.join(__dirname, './home.html')}`);
+  // Tell the popup window to load our loginGithub.html file.
+  // FASTACK_LOCAL=1 skips the OAuth screen and drops straight into Local mode.
+  const homeQuery = process.env.FASTACK_LOCAL === '1' ? '?local=1' : '';
+  window.loadURL(`file://${path.join(__dirname, './home.html')}${homeQuery}`);
 
   // Only close the window on blur if dev tools isn't opened
   window.on('blur', () => {
-    if(!window.webContents.isDevToolsOpened()) {
+    if (!window.webContents.isDevToolsOpened()) {
       window.hide()
     }
   })
@@ -81,7 +91,7 @@ var first = 0;
 const showWindowbef = () => {
   const trayPos = tray.getBounds();
   const windowPos = window.getBounds();
-  if (first === 0){
+  if (first === 0) {
     var x, y = 0;
     if (process.platform == 'darwin') {
       x = Math.round(trayPos.x + (trayPos.width / 2) - (windowPos.width / 2));

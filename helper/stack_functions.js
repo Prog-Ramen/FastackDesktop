@@ -1,6 +1,5 @@
 const base64 = require('base-64');
 var ls = require('local-storage');
-var cryptoHelper = require('./crypto_helper');
 ls('countdownTimer', {'id': 0});
 
 exports.createTask = function(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours, timeMins, priority, description, tags, notes, timeTaken, complete) {
@@ -25,16 +24,14 @@ exports.createTask = function(taskName, startDate, creationDate, completionDate,
 exports.stackSort = function(){
     var stack = ls('stack')['incomplete'];
     stack.sort(function(a,b){
-        var dec_b = decryptTask(b);
-        var dec_a = decryptTask(a);
-        return (dec_b.ignoreDates - dec_a.ignoreDates) || (!dec_b.ignoreDates && !dec_a.ignoreDates && (new Date(dec_a.startDate) - new Date(dec_b.startDate))) || dec_b.priority - dec_a.priority ||  (!dec_b.ignoreDates && !dec_a.ignoreDates && (new Date(dec_a.completionDate) - new Date(dec_b.completionDate))) ;
-      })
+        return (b.ignoreDates - a.ignoreDates) || (!b.ignoreDates && !a.ignoreDates && (new Date(a.startDate) - new Date(b.startDate))) || b.priority - a.priority ||  (!b.ignoreDates && !a.ignoreDates && (new Date(a.completionDate) - new Date(b.completionDate))) ;
+    })
     var stack_length = stack.length;
     var overdue = []
     var first = 0;
     var count = 0;
     for (var i = 0; i < stack_length; i++){
-    var task = this.decryptTask(stack[i]);
+    var task = stack[i];
     if (new Date(task.completionDate) < new Date() && !task.ignoreDates){
         if (count == 0){
         first = i;
@@ -44,34 +41,12 @@ exports.stackSort = function(){
     }
     }
     overdue.sort(function(a,b){
-        var dec_b = decryptTask(b);
-        var dec_a = decryptTask(a);
-        return dec_b.priority - dec_a.priority;
+        return b.priority - a.priority;
     });
     stack.splice(first, count);
     stack = overdue.concat(stack);
     ls('stack', {'incomplete': stack, 'complete': ls('stack')['complete']});
     return stack;
-}
-
-exports.encryptTask = function(task){
-    var encTask = {};
-    if (!ls('key')) {
-        return task;
-    }
-    for (var key in task) {
-        var encrypted = cryptoHelper.encrypt(task[key].toString(), ls('key'));
-        encTask[key] = encrypted;
-    }
-    return encTask;   
-}
-
-var encryptItem = exports.encryptItem = function(task, key){
-    if (!ls('key')) {
-        return task[key];
-    }
-    var encrypted = cryptoHelper.encrypt(task[key].toString(), ls('key'));
-    return encrypted;
 }
 
 exports.generateTranslate = function(stack_length, index, current) {
@@ -183,7 +158,7 @@ exports.generateFullStackHTML = function(current){
         var translate = result[0];
         var overhead = result[1];
         // Since we deal with Firefox and Chrome only
-        var decrypted = this.decryptTask(ls('stack')['incomplete'][index]);
+        var decrypted = ls('stack')['incomplete'][index];
         var status = this.generateStatus(decrypted);
         return_val += this.generateTaskHTML(index, translate, decrypted, overhead, status, current);
     }
@@ -212,7 +187,7 @@ exports.generateStatus = function(decrypted_task){
 
 exports.countdown = function(index){
     // Set the date we're counting down to
-    var task = stackFunctions.decryptTask(ls('stack')['incomplete'][index]);
+    var task = ls('stack')['incomplete'][index];
     var dt = new Date();
     dt.setHours(dt.getHours() + parseInt(task.timeHours));
     dt.setMinutes(dt.getMinutes() + parseInt(task.timeMins));
@@ -221,7 +196,7 @@ exports.countdown = function(index){
     // Update the count down every 1 second
     var x = setInterval(function() {
     var stack = ls('stack')['incomplete'];
-    var task = stackFunctions.decryptTask(stack[index]);
+    var task = stack[index];
 
     // Get today's date and time
     var now = new Date().getTime();
@@ -231,7 +206,6 @@ exports.countdown = function(index){
     var secHours = parseInt(task.timeHours) * (1000 * 60 * 60);
     var secMins = parseInt(task.timeMins) * (1000 * 60);
     stack[index].timeTaken = (secHours+secMins) - distance;
-    stack[index].timeTaken = encryptItem(stack[index], 'timeTaken');
     ls('stack', {'incomplete': stack, 'complete': ls('stack')['complete']});
         
     // Time calculations for days, hours, minutes and seconds
@@ -257,35 +231,6 @@ exports.clockIn = function(index){
 
 exports.clockOut = function(){
     clearInterval(ls('countdownTimer')['id']);
-    document.getElementById("status").innerHTML = '<h2>' + this.generateStatus(this.decryptTask(ls('stack')['incomplete'][0])) + '</h2>';
+    document.getElementById("status").innerHTML = '<h2>' + this.generateStatus(ls('stack')['incomplete'][0]) + '</h2>';
     ls('countdownTimer', {'id': 0});
-}
-
-var decryptTask = exports.decryptTask = function(task){
-    var decTask = {};
-    if (!ls('key')) {
-        return task;
-    }
-    for (var key in task) {
-        var decrypted = cryptoHelper.decrypt(task[key], ls('key'));
-        if (key == "ignoreDates" || key == "complete"){
-            decTask[key] = (decrypted === 'true');
-        } else {    
-            decTask[key] = decrypted;
-        }
-        
-    }      
-    return decTask;   
-}
-
-exports.decryptItem = function(task, key){
-    if (!ls('key')) {
-        return task[key];
-    }
-    var decrypted = cryptoHelper.decrypt(task[key], ls('key'));
-    if (key == "ignoreDates" || key == "complete"){
-        return (decrypted === 'true');
-    } else {
-        return decrypted;
-    }
 }

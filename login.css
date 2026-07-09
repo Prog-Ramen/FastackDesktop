@@ -20,7 +20,7 @@ body {
 
 .draggable {
     -ms-overflow-style: scrollbar;
-    -webkit-app-region:drag;
+    -webkit-app-region: drag;
 }
 
 #errorDropdown {
@@ -93,8 +93,9 @@ input[type=text] {
     padding-bottom: 10px;
     padding-top: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
+
 input[type=text] {
     margin: auto;
     font-size: 16px;
@@ -105,7 +106,7 @@ input[type=text] {
     padding-bottom: 10px;
     padding-top: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 input[type=password] {
@@ -117,7 +118,7 @@ input[type=password] {
     background: transparent;
     padding-bottom: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 nobr {
@@ -131,20 +132,12 @@ nobr {
     border: 0;
     background: transparent;
     white-space: nowrap;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
-#encstackdata {
-    margin: auto;
-    font-size: 16px;
-    color: white;
-    outline: none;
-    border: 0;
-    background: transparent;
-    -webkit-app-region:no-drag;
-}
-
-#github, #dropbox, #google {
+#github,
+#dropbox,
+#google {
     align-self: stretch;
     display: block;
     width: 70%;
@@ -158,10 +151,12 @@ nobr {
     color: white;
     border-radius: 25px;
     font-size: 15px;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
-#github:hover, #dropbox:hover, #google:hover {
+#github:hover,
+#dropbox:hover,
+#google:hover {
     align-self: stretch;
     display: block;
     width: 80%;
@@ -174,7 +169,21 @@ nobr {
     margin-top: 10px;
     color: white;
     font-size: 15px;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
+}
+
+.secondaryLink {
+    display: inline-block;
+    margin-top: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: "Trebuchet MS", Helvetica, sans-serif;
+    font-size: 13px;
+    text-decoration: none;
+    -webkit-app-region: no-drag;
+}
+.secondaryLink:hover {
+    color: #ffffff;
+    cursor: pointer;
 }
 
 input[type=submit] {
@@ -191,7 +200,7 @@ input[type=submit] {
     color: white;
     border-radius: 25px;
     font-size: 15px;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 input[type=submit]:hover {
@@ -210,11 +219,7 @@ input[type=submit]:hover {
     border-radius: 25px;
     transition: all 1s ease;
     -webkit-transition: all 1s ease;
-    -webkit-app-region:no-drag;
-}
-
-#stackpass {
-    opacity: 0;
+    -webkit-app-region: no-drag;
 }
 
 ::placeholder {
@@ -231,31 +236,31 @@ input[type=submit]:hover {
 
 
 .footer {
-    bottom:20px;
+    bottom: 20px;
     font-size: 15px;
     color: #9fbecf;
-    text-align:center;
-    padding-top:5px;
+    text-align: center;
+    padding-top: 5px;
     font-family: "Trebuchet MS";
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 .footer:hover {
     color: white;
-    cursor:pointer;
-    -webkit-app-region:no-drag;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
 }
 
-.center{
-    text-align:center;
+.center {
+    text-align: center;
 }
 
-#logoCat{
-    padding-bottom:30px;
+#logoCat {
+    padding-bottom: 30px;
 }
 
 .boxAround {
-    border:2px white solid;
+    border: 2px white solid;
     font-size: 24px;
     color: white;
     padding-top: 8px;
@@ -264,7 +269,7 @@ input[type=submit]:hover {
 }
 
 .headerInfo {
-    border-bottom:2px white solid;
+    border-bottom: 2px white solid;
     font-size: 19px;
     color: white;
     padding-top: 8px;
@@ -289,12 +294,12 @@ span {
     padding-bottom: 10px;
 }
 
-#repoBack{
-    margin-top:38px;
-    -webkit-app-region:no-drag;
+#repoBack {
+    margin-top: 38px;
+    -webkit-app-region: no-drag;
 }
 
 #backButton {
-    -webkit-app-region:no-drag!important;
+    -webkit-app-region: no-drag !important;
     display: block;
 }

@@ -29,7 +29,17 @@
             <p id="createTaskTitle">Settings</p>
             <form id="updateSettings">
                 <div class="tab">
-                </div> 
+                </div>
+                <div id="syncSection" style="display:none">
+                    <hr>
+                    <p style="color:white; margin-bottom:6px;">Push local stack to cloud</p>
+                    <center><input id="syncRepoName" type="text" placeholder="Cloud repo/folder name" style="width:80%; margin-bottom:8px;"></center>
+                    <center><input type="button" id="syncGithub" value="Github"></center>
+                    <center><input type="button" id="syncDropbox" value="Dropbox"></center>
+                    <center><input type="button" id="syncGoogle" value="Google Drive"></center>
+                    <center><span id="syncStatus" style="color:#d9a441; font-size:12px; display:block; margin-top:6px;"></span></center>
+                    <hr>
+                </div>
                 <span id="error" class="error"><br><br></span>
                 <br>
                 <br>

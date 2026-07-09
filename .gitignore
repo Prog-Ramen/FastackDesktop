@@ -1,3 +1,8 @@
 node_modules
 .idea
+.claude/
 package-lock.json
+release/
+dist/
+*.log
+.DS_Store
