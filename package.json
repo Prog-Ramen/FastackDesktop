@@ -35,8 +35,20 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "hardenedRuntime": false,
@@ -47,7 +59,12 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png"
     },
@@ -57,8 +74,18 @@
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "category": "Office"
@@ -72,6 +99,7 @@
     "webpack": "^4.12.2"
   },
   "dependencies": {
+    "@babel/parser": "^7.29.7",
     "@electron/remote": "^2.0.8",
     "@grpc/grpc-js": "^1.6.7",
     "@toast-ui/editor": "^3.1.7",
@@ -83,6 +111,8 @@
     "@toast-ui/editor-plugin-table-merged-cell": "^3.0.2",
     "@toast-ui/editor-plugin-uml": "^3.0.1",
     "@types/prismjs": "^1.26.0",
+    "@xenova/transformers": "^2.17.2",
+    "active-win": "^8.2.1",
     "async": "^3.2.4",
     "base-64": "^1.0.0",
     "bootstrap": "^5.1.3",
@@ -100,6 +130,7 @@
     "randombytes": "^2.1.0",
     "screenshot-desktop": "^1.12.7",
     "temp": "^0.9.4",
-    "tesseract.js": "^2.1.5"
+    "tesseract.js": "^2.1.5",
+    "undici": "^6.13.0"
   }
 }

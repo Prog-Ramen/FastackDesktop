@@ -19,6 +19,22 @@ var window = BrowserWindow.getFocusedWindow();
 $(document).ready(function () {
     setInterval(function(){ stackFunctions.stackSort()});
     ls('currIndex', 0);
+    // Recurring-task sweep: on load and every 60s. Spawns any templates whose
+    // nextRunAt has passed. Safe to call repeatedly — noop if nothing due.
+    try {
+        var spawnedNow = stackFunctions.checkRecurring();
+        if (spawnedNow) console.log('[fastack] recurring: spawned', spawnedNow, 'task(s)');
+    } catch (e) { console.log('recurring check failed:', e); }
+    setInterval(function () {
+        try {
+            var spawned = stackFunctions.checkRecurring();
+            if (spawned) {
+                // Re-render the board so the fresh instances show up.
+                $('.s1').empty();
+                $('.s1').append(stackFunctions.generateFullStackHTML(ls('currIndex') || 0));
+            }
+        } catch (e) {}
+    }, 60_000);
     //screenCapture.startRecordingText();
     var stack = stackFunctions.generateFullStackHTML(ls('currIndex'))
     console.log(stack);
@@ -59,7 +75,10 @@ $(document).ready(function () {
         }
     });
     $('#settingsButton').click(function(){
-        window.location.replace('./settings.html');  
+        window.location.replace('./settings.html');
+    });
+    $('#reportButton').click(function(){
+        window.location.replace('./report.html');
     });
     $(".taskName").mouseleave(function(){
         $(this).find('.header').css("text-overflow", "ellipsis");

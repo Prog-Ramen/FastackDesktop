@@ -3,6 +3,20 @@ var githubFunctions = require('../helper/github_functions');
 var dropboxFunctions = require('../helper/dropbox_functions');
 var gdriveFunctions = require('../helper/gdrive_functions');
 var localFunctions = require('../helper/local_functions');
+var tutorial = require('../helper/tutorial');
+// NOTE: don't declare `var remote = ...` here — stack.js / createTask.js
+// already do `const remote = ...` in the same classic-script scope and a
+// re-declaration throws SyntaxError, which halts this whole file.
+var __remote = require('@electron/remote');
+var __ipc = require('electron').ipcRenderer;
+
+// On macOS, Electron's globalShortcut consumes the key event before the DOM
+// sees it — so the tour's window-level keydown listener never fires. Each
+// registered callback below pings the tour explicitly so shortcut-gated
+// steps advance on the platform's real trigger.
+function notifyTour(key) {
+  try { tutorial.notifyShortcut(key); } catch (e) { /* tour not loaded on this page */ }
+}
 
 function updateSettings(callback) {
   var payload = JSON.stringify(ls('settings'));
@@ -86,80 +100,101 @@ function getCreateSettings(callback) {
     });
   }
 }
+var pageAlive = true;
+
+// Shortcuts are registered in the MAIN process (see main.js `register-shortcuts`
+// handler). Main runs a plain arrow when the accelerator fires and IPCs the
+// shortcut name here. No renderer closures are held in main, so navigating
+// pages can never leave a "Render frame was disposed" stale callback.
 function setGlobalVariables(settingsObject) {
-  globalShortcut.unregisterAll();
-  console.log(settingsObject);
-  globalShortcut.register(settingsObject.OpenCloseWindow, function () {
-    if (remote.getCurrentWindow().isVisible()) {
-      remote.getCurrentWindow().hide();
-    } else {
-      remote.getCurrentWindow().show();
-    }
-  });
-  globalShortcut.register(settingsObject.NewTask, function () {
-    ls('createPage', 'add');
-    window.location.replace("./createTask.html");
-  });
-  globalShortcut.register(settingsObject.ClockIn, function () {
-    stackFunctions.clockIn(0);
-  });
-  globalShortcut.register(settingsObject.ClockOut, function () {
-    stackFunctions.clockOut();
-  });
-
-  globalShortcut.register(settingsObject.EditTask, function () {
-    ls('createPage', 'edit');
-    window.location.replace('./createTask.html');
-  });
-
-  globalShortcut.register(settingsObject.Logout, function () {
-    window.location.replace('../home.html');
-  });
-
-  globalShortcut.register(settingsObject.ScrollTaskUp, function () {
-    var index = ls('currIndex');
-    if (index > 0) {
-      index--;
-      ls('currIndex', index);
-      $('.s1').empty();
-      $(".s1").append(stackFunctions.generateFullStackHTML(index));
-    }
-  });
-  globalShortcut.register(settingsObject.ScrollTaskDown, function () {
-    var index = ls('currIndex');
-    if (index < ls('stack')['incomplete'].length) {
-      index++;
-      ls('currIndex', index);
-      $('.s1').empty();
-      $(".s1").append(stackFunctions.generateFullStackHTML(index));
-    }
-  });
-
-  globalShortcut.register(settingsObject.Settings, function () {
-    window.location.replace('./settings.html');
-  });
-
-  globalShortcut.register(settingsObject.PopTask, function () {
-    var stack = ls('stack');
-    if (stack['incomplete'].length > 0) {
-      $(".task").first().hide("drop", { direction: "up" }, 1000);
-      setTimeout(function () {
-        stack['complete'].push(stack['incomplete'][0]);
-        stack['incomplete'].shift();
-
-        ls('stack', stack);
-        if (ls('stack')['incomplete'].length == 0) {
-          ls('createPage', 'add');
-          window.location.replace('./createTask.html');
-        }
-        $('.s1').empty();
-        $('.s1').append(stackFunctions.generateFullStackHTML(ls('currIndex') > 0 ? ls('currIndex') - 1 : 0));
-      }, 1000);
-
-    }
-  });
-
+  __ipc.send('register-shortcuts', [
+    { key: 'OpenCloseWindow', accel: settingsObject.OpenCloseWindow },
+    { key: 'NewTask',         accel: settingsObject.NewTask },
+    { key: 'ClockIn',         accel: settingsObject.ClockIn },
+    { key: 'ClockOut',        accel: settingsObject.ClockOut },
+    { key: 'EditTask',        accel: settingsObject.EditTask },
+    { key: 'Logout',          accel: settingsObject.Logout },
+    { key: 'ScrollTaskUp',    accel: settingsObject.ScrollTaskUp },
+    { key: 'ScrollTaskDown',  accel: settingsObject.ScrollTaskDown },
+    { key: 'Settings',        accel: settingsObject.Settings },
+    { key: 'PopTask',         accel: settingsObject.PopTask }
+  ]);
 }
+
+// A page may load settings.js more than once (e.g. included from two HTML
+// files). Clear prior handler so we don't double-run.
+__ipc.removeAllListeners('shortcut');
+__ipc.on('shortcut', function (_evt, key) {
+  if (!pageAlive) return;
+  try {
+    if (key === 'OpenCloseWindow') {
+      if (__remote.getCurrentWindow().isVisible()) __remote.getCurrentWindow().hide();
+      else __remote.getCurrentWindow().show();
+      notifyTour('OpenCloseWindow');
+    } else if (key === 'NewTask') {
+      ls('createPage', 'add');
+      notifyTour('NewTask');
+      window.location.replace('./createTask.html');
+    } else if (key === 'ClockIn') {
+      stackFunctions.clockIn(0);
+      notifyTour('ClockIn');
+    } else if (key === 'ClockOut') {
+      stackFunctions.clockOut();
+      notifyTour('ClockOut');
+    } else if (key === 'EditTask') {
+      ls('createPage', 'edit');
+      notifyTour('EditTask');
+      window.location.replace('./createTask.html');
+    } else if (key === 'Logout') {
+      window.location.replace('../home.html');
+    } else if (key === 'ScrollTaskUp') {
+      var iu = ls('currIndex');
+      if (iu > 0) {
+        iu--;
+        ls('currIndex', iu);
+        $('.s1').empty();
+        $('.s1').append(stackFunctions.generateFullStackHTML(iu));
+      }
+      notifyTour('ScrollTaskUp');
+    } else if (key === 'ScrollTaskDown') {
+      var id = ls('currIndex');
+      if (id < ls('stack')['incomplete'].length) {
+        id++;
+        ls('currIndex', id);
+        $('.s1').empty();
+        $('.s1').append(stackFunctions.generateFullStackHTML(id));
+      }
+      notifyTour('ScrollTaskDown');
+    } else if (key === 'Settings') {
+      notifyTour('Settings');
+      window.location.replace('./settings.html');
+    } else if (key === 'PopTask') {
+      var stack = ls('stack');
+      if (stack['incomplete'].length > 0) {
+        $('.task').first().hide('drop', { direction: 'up' }, 1000);
+        setTimeout(function () {
+          if (!pageAlive) return;
+          stack['complete'].push(stack['incomplete'][0]);
+          stack['incomplete'].shift();
+          ls('stack', stack);
+          stackFunctions.persistStack();
+          if (ls('stack')['incomplete'].length == 0 && ls('tourActive') !== true) {
+            ls('createPage', 'add');
+            window.location.replace('./createTask.html');
+          }
+          $('.s1').empty();
+          $('.s1').append(stackFunctions.generateFullStackHTML(ls('currIndex') > 0 ? ls('currIndex') - 1 : 0));
+        }, 1000);
+        notifyTour('PopTask');
+      }
+    }
+  } catch (e) { /* renderer state may be shutting down — no-op */ }
+});
+
+window.addEventListener('beforeunload', function () {
+  pageAlive = false;
+  try { __ipc.removeAllListeners('shortcut'); } catch (e) { /* noop */ }
+});
 var settings = {
   "OpenCloseWindow": "Alt+Z",
   "NewTask": "Alt+N",
@@ -177,14 +212,15 @@ var settings = {
 $(document).ready(function () {
 
   getCreateSettings(function (err, result) {
-    if (!err && result !== "success") {
-      settings = result;
+    // getCreateSettings returns either the parsed settings object OR the string "success"
+    // (when it had to create the file for the first time / when the file was unparseable).
+    // In the "success" case we fall back to the defaults so globalShortcut still registers.
+    if (!err && result && typeof result === 'object') {
+      // Merge loaded settings on top of defaults so any keys added in a later version
+      // still have a binding.
+      Object.keys(result).forEach(function (k) { settings[k] = result[k]; });
     }
     ls('settings', settings);
-    console.log(result);
-    setGlobalVariables(result);
-    if (result.skipTutorial !== true) {
-
-    }
+    setGlobalVariables(settings);
   });
 });

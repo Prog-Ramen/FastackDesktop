@@ -1,7 +1,17 @@
+/* ---- Fastack palette (pass 1: palette + typography) ----
+   bg      : rgba(15, 20, 25, 0.92)  deep near-black (window is transparent)
+   text    : #f5f7fa
+   muted   : #8b96a8
+   accent  : #5b9cd6
+   states  : overdue #d15656 · active #3ea680 · todo #6b7383 · complete #5b7a94
+   ----------------------------------------------------------- */
 body {
-    background-color: rgba(100, 129, 162, 0.0);
+    background-color: rgba(15, 20, 25, 0.92);
+    color: #f5f7fa;
     margin: 0;
     padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
 body * {
@@ -88,22 +98,26 @@ h3{
 .stack{flex-direction:column}
 /* End of framework code */
 
-body
-{
-  font-family: Helvetica, Arial, sans-serif;
-  font-size: 18px;
-} 
+/* body font-family already declared above with the system stack */
 
 .task
 {
   padding-top: 5%;
   text-overflow: clip;
   position: relative;
-  border-radius: 25px;
-  color: black;
+  border-radius: 14px;
+  color: #f5f7fa;
   opacity: 0.99;
-	box-shadow: 0 0.2em 1em 0.3em rgba(0,0,0, 0.9); 
+  box-shadow: 0 4px 18px rgba(0,0,0, 0.55);
   overflow: hidden;
+  transition: opacity 140ms ease, transform 160ms ease;
+}
+.task h2, .task th, .task td {
+  color: #ffffff;
+}
+.task td, .task th:not(:first-child) {
+  color: rgba(255,255,255,0.82);
+  font-weight: 400;
 }
 .glow {
   font-size: 18px;
@@ -133,6 +147,45 @@ body
   height: 100%;
   position: relative;
   background: transparent;
+}
+
+.fastack-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(26, 32, 41, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.fastack-toolbar .tb-icon {
+  filter: invert(1) brightness(0.85);
+  opacity: 0.8;
+  transition: opacity 120ms ease, transform 120ms ease;
+  cursor: pointer;
+}
+.fastack-toolbar .tb-icon:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.fastack-toolbar .tb-right {
+  margin-left: auto;
+}
+/* SVG toolbar icons don't get inverted like the PNGs — they use currentColor. */
+.fastack-toolbar .tb-svg {
+  color: #f5f7fa;
+  opacity: 0.8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 120ms ease, transform 120ms ease;
+  filter: none;
+}
+.fastack-toolbar .tb-svg:hover {
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 

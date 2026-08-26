@@ -4,6 +4,7 @@
     <script src="../node_modules/plantuml-encoder/dist/plantuml-encoder.js"></script>
     <title>FaStack</title>
     <link rel="stylesheet" type="text/css" href="stackInfo.css">
+    <link rel="stylesheet" type="text/css" href="./tutorial.css">
 </head>
 <body class="draggable">
 
@@ -19,6 +20,19 @@
                         <input id="tname" type="text" name="taskname">
                     </div>
                     <span id="nameError" class="error"><br></span>
+                    <div id="ragPanel" class="rag-panel" style="display:none;">
+                        <div class="rag-header">Related from your docs</div>
+                        <div id="ragResults"></div>
+                    </div>
+                    <div id="genNotesPanel" class="rag-panel">
+                        <div class="rag-header">
+                            Suggested notes
+                            <button type="button" id="genNotesRun" class="rag-use-btn">Generate</button>
+                            <button type="button" id="genNotesUse" class="rag-use-btn" style="display:none;">Use this</button>
+                        </div>
+                        <div id="genNotesStatus" class="rag-empty">Checking model…</div>
+                        <div id="genNotesOutput" class="rag-gen-output"></div>
+                    </div>
                     <div class="taskInput" id="start" style="display:none;">
                         <label for="startDate">Start Date</label>
                         <input id="startDate" type="datetime-local">
@@ -29,7 +43,41 @@
                     </div>
                     <br>
                     <div class="taskInput">
-                        <input type="checkbox" id="dates"><p style="display:inline">  Add Start and Completion Dates</p> 
+                        <input type="checkbox" id="dates"><p style="display:inline">  Add Start and Completion Dates</p>
+                    </div>
+                    <br>
+                    <div class="taskInput">
+                        <input type="checkbox" id="recurring"><p style="display:inline">  Recurring task</p>
+                    </div>
+                    <div id="recurringPanel" class="rag-panel" style="display:none;">
+                        <div class="rag-header">Schedule</div>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12px; color:#f5f7fa;">
+                            <label>Frequency
+                                <select id="recurFreq" style="margin-left:4px;">
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </label>
+                            <label id="recurDowLabel" style="display:none;">Day
+                                <select id="recurDow" style="margin-left:4px;">
+                                    <option value="0">Sun</option>
+                                    <option value="1" selected>Mon</option>
+                                    <option value="2">Tue</option>
+                                    <option value="3">Wed</option>
+                                    <option value="4">Thu</option>
+                                    <option value="5">Fri</option>
+                                    <option value="6">Sat</option>
+                                </select>
+                            </label>
+                            <label id="recurDomLabel" style="display:none;">Day of month
+                                <input id="recurDom" type="number" min="1" max="28" value="1" style="width:48px; margin-left:4px;">
+                            </label>
+                            <label>At
+                                <input id="recurTime" type="time" value="09:00" style="margin-left:4px;">
+                            </label>
+                        </div>
+                        <div id="recurNext" class="rag-empty" style="margin-top:4px;">Next run: —</div>
                     </div>
                     <br>
                     <label for="compDate">Estimated Time Required</label><br><br><br>
@@ -47,6 +95,15 @@
                         <label for="description">Description </label><br><br>
                         <textarea id="description" class="boxInput" name="description"></textarea><br><br>
                     </div>
+                    <div id="genDescPanel" class="rag-panel">
+                        <div class="rag-header">
+                            Suggested description
+                            <button type="button" id="genDescRun" class="rag-use-btn" disabled>Summarize notes</button>
+                            <button type="button" id="genDescUse" class="rag-use-btn" style="display:none;">Use this</button>
+                        </div>
+                        <div id="genDescStatus" class="rag-empty">Generate or write notes first.</div>
+                        <div id="genDescOutput" class="rag-gen-output"></div>
+                    </div>
                     <div class="taskInput">
                         <label for="tags">Tags </label><br>
                         <input id="tags" type="text" name="tags">
@@ -63,13 +120,16 @@
                 <br>
                 <br>
                 <center><input type="submit" id="submitTask" value="Create Task"></center>
-                <center><input type="submit" id="goBack" value="Go Back"></center>
+                <center><input type="submit" id="goBack" class="btn-ghost" value="Go Back"></center>
             </form>
         </div>
     </div>
 </div>
 <script charset="utf-8" type="text/javascript" src="./createTask.js"></script>
 <script charset="utf-8" type="text/javascript" src="./settings.js"></script>
-
+<script>
+  var __tour = require('../helper/tutorial');
+  __tour.init();
+</script>
 </body>
 </html>

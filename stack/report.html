@@ -1,0 +1,57 @@
+<html>
+<head>
+  <title>Fastack — Report</title>
+  <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+  <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="./stack.css">
+  <link rel="stylesheet" type="text/css" href="./report.css">
+  <script>if (window.module) module = window.module;</script>
+</head>
+<body class="draggable">
+  <div class="container">
+    <div class="fastack-toolbar">
+      <img id="backButton" class="tb-icon" src="../images/back_button.png" alt="Back" height="18" width="18">
+      <span class="report-title">Productivity</span>
+      <div class="tabs tb-right">
+        <span class="tab active" data-range="today">Today</span>
+        <span class="tab" data-range="week">Week</span>
+        <span class="tab" data-range="all">All</span>
+      </div>
+    </div>
+
+    <div class="report-body">
+      <div id="emptyState" class="empty" style="display:none">
+        No activity recorded yet. Clock into a task and the tracker will
+        capture app/idle metadata locally.
+      </div>
+
+      <div id="content">
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-value" id="kpiFocus">0m</div><div class="kpi-label">Focus</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiActive">0%</div><div class="kpi-label">Active</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiCompleted">0</div><div class="kpi-label">Done</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiStreak">0d</div><div class="kpi-label">Streak</div></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">By category</div>
+          <div class="chart-canvas-wrap"><canvas id="categoryChart"></canvas></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Top apps</div>
+          <div class="chart-canvas-wrap short"><canvas id="appsChart"></canvas></div>
+        </div>
+
+        <div class="chart-block" id="sessionsBlock">
+          <div class="chart-label">Recent sessions</div>
+          <div id="sessionsList" class="sessions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script charset="utf-8" type="text/javascript" src="./report.js"></script>
+</body>
+</html>

@@ -36,6 +36,22 @@ $(document).ready(function () {
     $(this).attr("clicked", "true");
   });
 
+  // Route to createTask on the *very first* launch (never seen the tour AND no history),
+  // otherwise land on stack. An empty stack after real use should still show the stack page,
+  // not force the user into task creation.
+  function routeAfterLogin() {
+    var s = ls('stack') || {};
+    var incomplete = (s.incomplete || []).length;
+    var complete = (s.complete || []).length;
+    var neverUsed = ls('tourSeen') !== true && incomplete === 0 && complete === 0;
+    if (neverUsed) {
+      ls('createPage', 'add');
+      window.location.replace('./stack/createTask.html');
+    } else {
+      window.location.replace('./stack/stack.html');
+    }
+  }
+
   function goLocal() {
     ls('platform', 'Local');
     ls('token', '');
@@ -47,12 +63,7 @@ $(document).ready(function () {
       prestack.lookForStackLocal(function (err, stackValue) {
         if (err) console.log(err);
         ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-        if (ls('stack')['incomplete'].length === 0) {
-          ls('createPage', 'add');
-          window.location.replace("./stack/createTask.html");
-        } else {
-          window.location.replace("./stack/stack.html");
-        }
+        routeAfterLogin();
       });
     });
   }
@@ -161,12 +172,7 @@ $(document).ready(function () {
                       $('#errorreponame').text("Cannot get the current stack from the repository: " + err.message);
                     }
                     ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-                    if (ls('stack')['incomplete'].length === 0) {
-                      ls('createPage', 'add');
-                      window.location.replace("./stack/createTask.html");
-                    } else {
-                      window.location.replace("./stack/stack.html");
-                    }
+                    routeAfterLogin();
                   });
                 } else {
                   window.location.replace("./stack/stack_name_db.html");
@@ -250,12 +256,7 @@ $(document).ready(function () {
               $('#errorreponame').text("Cannot get the current stack from the folder: " + (err.message || err));
             }
             ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-            if (ls('stack')['incomplete'].length === 0) {
-              ls('createPage', 'add');
-              window.location.replace("./stack/createTask.html");
-            } else {
-              window.location.replace("./stack/stack.html");
-            }
+            routeAfterLogin();
           });
         } else {
           ls("reponame", "");
@@ -280,12 +281,7 @@ $(document).ready(function () {
                 $('#errorreponame').text("Cannot get the current stack from the repository: " + err.message);
               }
               ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-              if (ls('stack')['incomplete'].length === 0) {
-                ls('createPage', 'add');
-                window.location.replace("./stack/createTask.html");
-              } else {
-                window.location.replace("./stack/stack.html");
-              }
+              routeAfterLogin();
             });
           } else {
             console.log("SWITCHING");

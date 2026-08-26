@@ -148,3 +148,29 @@ exports.readNamedFile = function (repoName, filename) {
   if (!fs.existsSync(full)) return null;
   return fs.readFileSync(full, 'utf8');
 };
+
+// Walk <repoDir>/activity/<year>/<month>/<day> and return every session as a flat
+// list: [{ date: 'YYYY-M-D', session: {...} }, ...]. Used by the report page.
+exports.readAllActivity = function (repoName) {
+  var out = [];
+  var base = path.join(repoDir(repoName), 'activity');
+  if (!fs.existsSync(base)) return out;
+  var years = fs.readdirSync(base, { withFileTypes: true }).filter(function (e) { return e.isDirectory() && /^\d{4}$/.test(e.name); });
+  years.forEach(function (yEnt) {
+    var yDir = path.join(base, yEnt.name);
+    var months = fs.readdirSync(yDir, { withFileTypes: true }).filter(function (e) { return e.isDirectory() && /^\d{1,2}$/.test(e.name); });
+    months.forEach(function (mEnt) {
+      var mDir = path.join(yDir, mEnt.name);
+      var days = fs.readdirSync(mDir, { withFileTypes: true }).filter(function (e) { return e.isFile() && /^\d{1,2}$/.test(e.name.replace(/\.json$/, '')); });
+      days.forEach(function (dEnt) {
+        var raw = fs.readFileSync(path.join(mDir, dEnt.name), 'utf8');
+        var sessions;
+        try { sessions = JSON.parse(raw); } catch (e) { return; }
+        if (!Array.isArray(sessions)) return;
+        var dateKey = yEnt.name + '-' + mEnt.name + '-' + dEnt.name.replace(/\.json$/, '');
+        sessions.forEach(function (s) { out.push({ date: dateKey, session: s }); });
+      });
+    });
+  });
+  return out;
+};
