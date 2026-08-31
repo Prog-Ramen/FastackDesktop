@@ -83,6 +83,26 @@ $(document).ready(function () {
         });
     });
 
+    // ---------- Keyboard activity tracking (optional) ----------
+    // Native addon captures global keyboard events. Needs Accessibility
+    // permission on macOS Sonoma+. Default is off.
+    var kbTrackingEnabled = !!ls('keyboardTrackingEnabled');
+    $('#keyboardTrackingEnabled').prop('checked', kbTrackingEnabled);
+    $('#activityStatus').text(kbTrackingEnabled ? 'Enabled (native addon).' : 'Disabled.');
+    $('#keyboardTrackingEnabled').on('change', function () {
+        var on = $(this).prop('checked');
+        ls('keyboardTrackingEnabled', on);
+        kbTrackingEnabled = on;
+        if (on) {
+            // Tell main to start the addon.
+            try { require('@electron/remote').ipcRenderer.send('keyboard:init'); } catch (e) {}
+            $('#activityStatus').text('Enabled (native addon).');
+        } else {
+            try { require('@electron/remote').ipcRenderer.send('keyboard:stop'); } catch (e) {}
+            $('#activityStatus').text('Disabled.');
+        }
+    });
+
     // ---------- Recurring tasks management ----------
     function summarizeSchedule(r) {
         if (!r) return '';

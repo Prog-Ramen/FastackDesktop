@@ -3,26 +3,28 @@
 // Reads all activity sessions from the active backend, aggregates per range
 // (today / week / all), and renders KPIs + Chart.js pies/bars.
 // No model calls, no external requests. Pure rollup.
+//
+// Activity samples use idle detection (powerMonitor, zero permissions) and
+// behavioral categorization when the popup has focus:
+//   idle   → system idle 30s+
+//   write  → dominant typing (keyboard >> scroll)
+//   read   → dominant scrolling (scroll >> keyboard)
+//   browse → mouse-driven, low keyboard
+//   other  → active but unclear pattern
 
 var ls = require('local-storage');
 var localFunctions = require('../helper/local_functions');
 
 var SAMPLE_MS = 5000;              // Must match activity_tracker.SAMPLE_MS
 var CATEGORY_COLORS = {
-  code:   '#3ea680',
-  browse: '#5b9cd6',
-  read:   '#c48ac0',
   write:  '#e0a760',
-  comms:  '#d15656',
+  read:   '#c48ac0',
+  browse: '#5b9cd6',
   idle:   '#6b7383',
   other:  '#8b96a8'
 };
 
 function loadSessions() {
-  // For now the report reads the local-backend activity tree directly.
-  // Cloud backends store the same shape via activity_tracker.stop(), so a
-  // future extension can add per-backend enumerators; the aggregation code
-  // below is agnostic to source.
   if (ls('platform') !== 'Local') return null;
   try { return localFunctions.readAllActivity(ls('repoName') || 'local'); }
   catch (e) { return []; }
@@ -48,10 +50,8 @@ function filterRange(rows, range) {
 }
 
 function aggregate(rows) {
-  // Each sample represents SAMPLE_MS of observation. Categories/apps get
-  // that block of time added, so totals are in ms.
+  // Each sample represents SAMPLE_MS of observation.
   var byCategory = {};
-  var byApp = {};
   var activeMs = 0;
   var idleMs = 0;
   var sessions = [];
@@ -63,12 +63,7 @@ function aggregate(rows) {
       var cat = sample.category || 'other';
       byCategory[cat] = (byCategory[cat] || 0) + SAMPLE_MS;
       if (sample.idle) { idleMs += SAMPLE_MS; sessIdle += SAMPLE_MS; }
-      else {
-        activeMs += SAMPLE_MS;
-        sessActive += SAMPLE_MS;
-        var app = sample.app || 'unknown';
-        byApp[app] = (byApp[app] || 0) + SAMPLE_MS;
-      }
+      else { activeMs += SAMPLE_MS; sessActive += SAMPLE_MS; }
     });
     sessions.push({
       taskName: s.taskName || 'untitled',
@@ -80,7 +75,6 @@ function aggregate(rows) {
   });
   return {
     byCategory: byCategory,
-    byApp: byApp,
     activeMs: activeMs,
     idleMs: idleMs,
     focusMs: activeMs + idleMs,
@@ -89,8 +83,6 @@ function aggregate(rows) {
 }
 
 function completedInRange(range) {
-  // "Completed" is derived from ls('stack').complete. Range filter uses each
-  // task's completionDate if available, else it lands in "all".
   var stack = ls('stack') || {};
   var complete = stack.complete || [];
   var today = new Date();
@@ -114,7 +106,6 @@ function completedInRange(range) {
 }
 
 function computeStreak(rows) {
-  // Consecutive days ending today with at least one recorded session.
   if (!rows || !rows.length) return 0;
   var days = {};
   rows.forEach(function (r) { days[r.date] = true; });
@@ -148,7 +139,6 @@ function formatTime(ts) {
 }
 
 var categoryChart = null;
-var appsChart = null;
 
 function render(range) {
   var all = loadSessions();
@@ -163,7 +153,7 @@ function render(range) {
   var agg = aggregate(scoped);
 
   if (!agg.focusMs && !agg.sessions.length) {
-    $empty.text('No activity recorded for this range yet. Clock into a task and the tracker will capture app/idle metadata locally.').show();
+    $empty.text('No activity recorded for this range yet. Clock into a task and the tracker will capture idle/active metadata locally.').show();
     $content.hide();
     return;
   }
@@ -176,10 +166,9 @@ function render(range) {
   $('#kpiCompleted').text(completedInRange(range));
   $('#kpiStreak').text(computeStreak(all) + 'd');
 
-  // Category doughnut — cap at top 6 categories so labels remain readable,
-  // and put the legend at the bottom (300px wide popup can't afford a side legend).
+  // Category doughnut — cap at top 5 categories, legend at bottom.
   var catAll = Object.keys(agg.byCategory).sort(function (a, b) { return agg.byCategory[b] - agg.byCategory[a]; });
-  var catLabels = catAll.slice(0, 6);
+  var catLabels = catAll.slice(0, 5);
   var catData = catLabels.map(function (k) { return Math.round(agg.byCategory[k] / 60000); });
   var catColors = catLabels.map(function (k) { return CATEGORY_COLORS[k] || '#8b96a8'; });
   if (categoryChart) categoryChart.destroy();
@@ -202,36 +191,7 @@ function render(range) {
     }
   });
 
-  // Top apps horizontal bar — cap 5, truncate long labels.
-  var appEntries = Object.keys(agg.byApp).map(function (k) { return [k, agg.byApp[k]]; });
-  appEntries.sort(function (a, b) { return b[1] - a[1]; });
-  appEntries = appEntries.slice(0, 5);
-  var truncApp = function (name) { return name && name.length > 18 ? name.slice(0, 16) + '…' : name; };
-  if (appsChart) appsChart.destroy();
-  appsChart = new Chart(document.getElementById('appsChart').getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels: appEntries.map(function (e) { return truncApp(e[0]); }),
-      datasets: [{
-        data: appEntries.map(function (e) { return Math.round(e[1] / 60000); }),
-        backgroundColor: '#5b9cd6',
-        borderRadius: 4,
-        barThickness: 14
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      indexAxis: 'y',
-      layout: { padding: { right: 4 } },
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (ctx) { return ctx.parsed.x + 'm'; } } } },
-      scales: {
-        x: { ticks: { color: '#8b96a8', font: { size: 10 }, precision: 0 }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#f5f7fa', font: { size: 10.5 } }, grid: { display: false } }
-      }
-    }
-  });
-
-  // Sessions list — cap at 10 (outer scroll handles the rest of the page).
+  // Sessions list — cap at 10.
   var $s = $('#sessionsList').empty();
   var reversed = agg.sessions.slice().sort(function (a, b) { return (b.startTs || 0) - (a.startTs || 0); }).slice(0, 10);
   reversed.forEach(function (s) {

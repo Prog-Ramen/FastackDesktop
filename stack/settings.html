@@ -23,6 +23,24 @@
             <div class="tab shortcuts-grid"></div>
         </section>
 
+        <!-- Keyboard activity tracking -->
+        <section class="card" id="activitySection">
+            <div class="card-header">
+                <h2 class="card-title">Keyboard activity tracking</h2>
+                <label class="switch" title="Capture global keyboard activity to distinguish writing from reading in the productivity report">
+                    <input type="checkbox" id="keyboardTrackingEnabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="card-subtitle">
+                Uses a native keyboard hook to count keystrokes system-wide.
+                The productivity report then distinguishes <strong>writing</strong> (typing) from <strong>reading</strong> (scrolling).
+                Requires <strong>Accessibility permission</strong> on macOS Sonoma+ (one-time system dialog).
+                Default is off — your keystroke content is never captured, only the count.
+            </p>
+            <span id="activityStatus" class="card-subtitle" style="color:#8b96a8">Disabled.</span>
+        </section>
+
         <!-- Onboarding -->
         <section class="card" id="tourSection">
             <div class="card-header">

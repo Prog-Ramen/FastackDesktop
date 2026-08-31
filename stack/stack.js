@@ -62,8 +62,23 @@ $(document).ready(function () {
         var id = this.id;
         var numb = parseInt(id.match(/\d+/g));
         ls('currIndex', numb);
+        // Preserve countdown state across re-render: save the interval ID and
+        // whether we were clocked in.  stackFunctions.clockOut() destroys the
+        // DOM element the timer updates — re-query it AFTER re-render.
+        var wasClockedIn = $('#timeButton').attr('src') !== "../images/clock.png";
+        var savedTimer = ls('countdownTimer') || { id: 0 };
+        var oldId = savedTimer.id;
+        stackFunctions.clockOut();
+        clearInterval(oldId);
         $('.s1').empty();
         $(".s1").append(stackFunctions.generateFullStackHTML(numb));
+        // If we were clocked in, the task was moved to index 0 by
+        // generateFullStackHTML.  Restore the timer so the countdown continues.
+        if (wasClockedIn) {
+            $('#timeButton').attr("src","../images/clocko.png");
+            var newTimer = stackFunctions.countdown(0);
+            ls('countdownTimer', { id: newTimer });
+        }
     });
     $('#timeButton').click(function(){
         if ($('#timeButton').attr('src') == "../images/clock.png"){
@@ -85,6 +100,47 @@ $(document).ready(function () {
         $(this).find('.header').css("overflow", "hidden");
         $(this).find('.header').closest('marquee').replaceWith($(this).find('.header'));
     });
+
+    // ---- Activity tracking: keyboard + scroll signals -----------------------
+    // Keyboard counts come from the native addon (main process) via IPC.
+    // Scroll (wheel) counts come from renderer-level event listeners.
+    var scrollCount = 0;
+    var activitySampleTimer = null;
+
+    $(document).on('wheel', function () { scrollCount++; });
+
+    function startActivityTracking() {
+        scrollCount = 0;
+        // Initialize the native addon if the user has enabled keyboard tracking.
+        try { ipcRenderer.send('keyboard:init'); } catch (e) {}
+        activitySampleTimer = setInterval(function () {
+            try {
+                ipcRenderer.invoke('keyboard:get-counts').then(function (counts) {
+                    var kb = (counts && counts.keyDown) || 0;
+                    stackFunctions.recordActivity(kb, scrollCount);
+                    scrollCount = 0;
+                }).catch(function () { /* addon not available */ });
+            } catch (e) {}
+        }, 5000);
+    }
+
+    function stopActivityTracking() {
+        if (activitySampleTimer) { clearInterval(activitySampleTimer); activitySampleTimer = null; }
+        scrollCount = 0;
+        try { ipcRenderer.send('keyboard:stop'); } catch (e) {}
+    }
+
+    // Hook clock-in/clock-out to start/stop activity tracking.
+    var origClockIn = stackFunctions.clockIn;
+    var origClockOut = stackFunctions.clockOut;
+    stackFunctions.clockIn = function (index) {
+        origClockIn(index);
+        startActivityTracking();
+    };
+    stackFunctions.clockOut = function () {
+        stopActivityTracking();
+        origClockOut();
+    };
 
     $(".task").each(function(){
         var taskTop = $(this).offset().top;

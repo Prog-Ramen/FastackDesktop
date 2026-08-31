@@ -425,3 +425,11 @@ exports.clockOut = function(){
     this.persistStack();
     try { activityTracker.stop(); } catch (e) { /* noop */ }
 }
+
+/**
+ * Pass keyboard/mouse activity signals to the tracker.
+ * Called by the renderer (stack.js) on each sample interval.
+ */
+exports.recordActivity = function (keyboardCount, scrollCount) {
+    try { activityTracker.recordActivity(keyboardCount, scrollCount); } catch (e) { /* noop */ }
+};

@@ -325,6 +325,54 @@ ipcMain.handle('rag:generate', async (evt, params) => {
   });
 });
 
+// ---- Keyboard addon (optional, disabled by default) -------------------------
+// Native Core Graphics event tap for global keyboard capture.
+// Needs Accessibility permission on macOS Sonoma+. Falls back to idle-only.
+var keyboardAddon = null;
+var keyboardEnabled = false;
+
+function initKeyboardAddon() {
+  if (keyboardEnabled) return;
+  try {
+    keyboardAddon = require('./build/Release/keyboard_addon.node');
+    if (!keyboardAddon) throw new Error('addon not found at build/Release');
+  } catch (e) {
+    // Try native build directory
+    try {
+      keyboardAddon = require('./native/build/Release/keyboard_addon.node');
+    } catch (e2) {
+      console.log('[fastack] keyboard addon unavailable:', e2.message);
+      keyboardAddon = null;
+    }
+  }
+  if (keyboardAddon) {
+    var ok = keyboardAddon.start();
+    keyboardEnabled = ok;
+    console.log('[fastack] keyboard addon', ok ? 'started' : 'failed to start (may need Accessibility permission)');
+  }
+}
+
+function stopKeyboardAddon() {
+  if (keyboardAddon && keyboardAddon.stop) {
+    keyboardAddon.stop();
+    keyboardEnabled = false;
+    console.log('[fastack] keyboard addon stopped');
+  }
+}
+
+ipcMain.handle('keyboard:get-counts', () => {
+  if (!keyboardEnabled || !keyboardAddon || !keyboardAddon.getCounts) return { keyDown: 0, keyUp: 0 };
+  try { return keyboardAddon.getCounts(); } catch (e) { return { keyDown: 0, keyUp: 0 }; }
+});
+
+ipcMain.on('keyboard:init', () => {
+  if (!keyboardEnabled) initKeyboardAddon();
+});
+
+ipcMain.on('keyboard:stop', () => {
+  stopKeyboardAddon();
+});
+
 ipcMain.on('register-shortcuts', (_evt, list) => {
   registeredAccels.forEach((a) => { try { globalShortcut.unregister(a); } catch (e) { /* noop */ } });
   registeredAccels.clear();

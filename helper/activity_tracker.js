@@ -1,16 +1,24 @@
 // Privacy-preserving activity tracker.
 //
-// Samples the active application + idle state every SAMPLE_MS during a clock-in
-// window. Categorizes the app into a coarse bucket (code/browse/read/write/
-// comms/other) and drops the raw window title before it hits disk. Persists
-// per-task sessions into whichever backend is active, mirroring the stack
-// layout: <repo>/activity/<year>/<month>/<day>.json
+// Samples idle state + user activity signals every SAMPLE_MS during a clock-in
+// window. No app names, no window titles, no screen recording — just behavioral
+// signals from the keyboard and mouse:
+//
+//   - keyboardCount: number of keydown events in the interval
+//   - scrollCount:   number of wheel (scroll) events in the interval
+//
+// Categorization (done per 5s sample):
+//   idle    → powerMonitor says user is idle (30s+ no input)
+//   write   → keyboard >> scroll (dominant typing)
+//   read    → scroll >> keyboard (dominant scrolling)
+//   browse  → moderate activity, low keyboard (mouse-driven)
+//   other   → active but unclear pattern
 //
 // A session record:
-//   { taskName, startTs, endTs, samples: [{ ts, app, category, idle }] }
+//   { taskName, startTs, endTs, samples: [{ ts, category, idle }] }
 //
-// `app` is the process/owner name only (e.g. "Visual Studio Code") — never the
-// window title. `idle` is a boolean derived from powerMonitor.getSystemIdleTime.
+// Persists per-task sessions into whichever backend is active:
+// <repo>/activity/<year>/<month>/<day>.json
 
 var ls = require('local-storage');
 var githubFunctions = require('./github_functions');
@@ -24,28 +32,35 @@ var IDLE_THRESHOLD_SEC = 30;
 var currentSession = null;
 var sampleTimer = null;
 
-function categorize(appName) {
-  var a = (appName || '').toLowerCase();
-  if (/code|xcode|intellij|pycharm|webstorm|sublime|atom|vim|neovim|emacs|cursor|zed|android studio|rider|clion|goland|rubymine|terminal|iterm|warp|hyper|alacritty|kitty/.test(a)) return 'code';
-  if (/chrome|safari|firefox|edge|brave|arc|opera|vivaldi/.test(a)) return 'browse';
-  if (/preview|adobe|acrobat|kindle|reader|books|foxit/.test(a)) return 'read';
-  if (/word|pages|notion|obsidian|bear|ulysses|typora|scrivener|google docs|onenote/.test(a)) return 'write';
-  if (/slack|discord|zoom|teams|mail|outlook|messages|whatsapp|telegram|signal|skype/.test(a)) return 'comms';
+// Last-known activity signals, set by the renderer via recordActivity().
+var lastKeyboardCount = 0;
+var lastScrollCount = 0;
+
+/**
+ * Called by the renderer (stack.js) on each sample interval with counts of
+ * keydown and wheel events observed since the last sample.
+ */
+exports.recordActivity = function (keyboardCount, scrollCount) {
+  lastKeyboardCount = keyboardCount || 0;
+  lastScrollCount = scrollCount || 0;
+};
+
+function categorizeFromSignals(idle) {
+  if (idle) return 'idle';
+  var kb = lastKeyboardCount || 0;
+  var sc = lastScrollCount || 0;
+  // Dominant typing = writing
+  if (kb >= 3 && kb > sc * 2) return 'write';
+  // Dominant scrolling = reading
+  if (sc >= 2 && sc > kb * 2) return 'read';
+  // Mouse-driven with little typing = browsing
+  if (sc >= 1 && kb < 3) return 'browse';
+  // Active but unclear
   return 'other';
 }
 
-// active-win on macOS spawns a helper binary that requests Screen Recording
-// permission the first time it runs. That permission prompt steals focus,
-// blurs the popup, and hides it — a jarring side-effect of pressing Alt+C.
-// For v1 we skip per-app breakdown entirely and only sample idle state via
-// powerMonitor, which needs no permission and doesn't disturb the popup.
-// (Set FASTACK_TRACK_APPS=1 in dev if you've already granted the prompt.)
-var trackApps = process && process.env && process.env.FASTACK_TRACK_APPS === '1';
-var activeWinDisabled = !trackApps;
-
 function takeSample() {
   if (!currentSession) return;
-  var app = 'unknown';
   var idle = false;
   try {
     var remote = require('@electron/remote');
@@ -55,25 +70,12 @@ function takeSample() {
   if (!currentSession) return;
   currentSession.samples.push({
     ts: Date.now(),
-    app: app,
-    category: idle ? 'idle' : 'other',
+    category: categorizeFromSignals(idle),
     idle: idle
   });
-  if (activeWinDisabled) return;
-  // Opt-in path: probe active-win asynchronously and patch the sample we just
-  // pushed if we get a result. Never blocks the timer and never disturbs the
-  // popup on the sync path above.
-  (async function () {
-    try {
-      var mod = await import('active-win');
-      var win = await mod.default();
-      if (win && win.owner && win.owner.name && currentSession && currentSession.samples.length) {
-        var last = currentSession.samples[currentSession.samples.length - 1];
-        last.app = win.owner.name;
-        if (!last.idle) last.category = categorize(win.owner.name);
-      }
-    } catch (e) { activeWinDisabled = true; }
-  })();
+  // Reset signals for the next interval.
+  lastKeyboardCount = 0;
+  lastScrollCount = 0;
 }
 
 // Fire-and-forget: the tracker must not block clock-in.
@@ -150,6 +152,3 @@ exports.stop = function (callback) {
 exports.isRunning = function () { return currentSession !== null; };
 
 exports.currentTaskName = function () { return currentSession ? currentSession.taskName : null; };
-
-// Exposed for the report page so it can categorize on the fly if needed.
-exports.categorize = categorize;
