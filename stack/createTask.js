@@ -20,25 +20,38 @@ var localFunctions = require('../helper/local_functions');
 var { ipcRenderer } = remote;
 var cryptoHelper = require('../helper/crypto_helper');
 var stackFunctions = require('../helper/stack_functions');
+var intelligence = require('../helper/intelligence');
 // RAG lives in main to keep the popup renderer's heap tiny — see setting.js.
 var ragIpc = require('electron').ipcRenderer;
 
 var window = BrowserWindow.getFocusedWindow();
 
+function navigateTo(url) {
+  document.body.classList.add('page-leaving');
+  setTimeout(function () { window.location.replace(url); }, 110);
+}
+
 
 app.whenReady().then(() => {
   if (ls('stack')['incomplete'].length == 0) {
     $('#goBack').hide();
+    $('#headerBack').hide();
   } else {
     $('#goBack').show();
+    $('#headerBack').show();
   }
-  $('#goBack').click(function () {
-    window.location.replace('./stack.html');
+  $('#goBack, #headerBack').click(function (evt) {
+    evt.preventDefault();
+    navigateTo('./stack.html');
   })
   if (ls('createPage') == "edit") {
     $("#createTaskTitle").text("Edit Task");
     $("#submitTask").val("Submit Changes");
   }
+  $('#tname').on('input', function () {
+    var ready = $(this).val().trim().length > 0;
+    $('#createStatus').toggleClass('is-ready', ready).text(ready ? 'Ready' : 'Draft');
+  });
   var chartOptions = {
     name: 'chart',
     maxWidth: 200,
@@ -62,6 +75,45 @@ app.whenReady().then(() => {
       }
     },
     plugins: [[chart, chartOptions], [codeSyntaxHighlight, { highlighter: Prism }], colorSyntax, tableMergedCell, uml]
+  });
+  var suggestedEstimate = null;
+  var coachTimer = null;
+  function refreshTaskCoach() {
+    var title = ($('#tname').val() || '').trim();
+    if (title.length < 3) { $('#taskCoach').hide(); return; }
+    var savedStack = ls('stack') || { incomplete: [], complete: [] };
+    suggestedEstimate = intelligence.suggestEstimate(title, savedStack.complete || []);
+    var related = intelligence.searchTasks(title, (savedStack.incomplete || []).concat(savedStack.complete || []), 3)
+      .filter(function (row) { return row.score >= 0.12 && row.task.taskName !== title; });
+    if (suggestedEstimate) {
+      $('#estimateSuggestion').text('Similar work usually takes about ' + suggestedEstimate.minutes + ' minutes (' + suggestedEstimate.examples + ' examples).');
+      $('#applyEstimate').show();
+    } else {
+      $('#estimateSuggestion').text('Not enough similar completed work for an estimate yet.');
+      $('#applyEstimate').hide();
+    }
+    $('#similarTasks').text(related.length ? 'Related: ' + related.map(function (r) { return r.task.taskName; }).join(' · ') : '');
+    $('#taskCoach').show();
+  }
+  $('#tname').on('input', function () {
+    clearTimeout(coachTimer);
+    coachTimer = setTimeout(refreshTaskCoach, 180);
+  });
+  $('#applyEstimate').on('click', function () {
+    if (!suggestedEstimate) return;
+    $('#hours').val(Math.floor(suggestedEstimate.minutes / 60));
+    $('#minutes').val(suggestedEstimate.minutes % 60).trigger('input');
+    $(this).text('Estimate applied');
+  });
+  $('#decomposeTask').on('click', function () {
+    var title = ($('#tname').val() || '').trim();
+    if (!title) { $('#nameError').text('Enter a task name first.'); return; }
+    var steps = intelligence.decomposeTask(title);
+    var existing = editor.getMarkdown().trim();
+    var markdown = '## Steps\n' + steps.map(function (step) { return '- [ ] ' + step; }).join('\n');
+    editor.setMarkdown(existing ? existing + '\n\n' + markdown : markdown);
+    $('.notes-card').prop('open', true);
+    $(this).text('Steps added');
   });
   createTaskInput();
   function zeroPadded(val) {
@@ -298,9 +350,9 @@ app.whenReady().then(() => {
         $('#genDescRun').prop('disabled', true);
         $('#genNotesStatus').text('Model load failed: ' + (state.error || 'unknown'));
       } else {
-        $('#genNotesRun').prop('disabled', true).text('Preparing…');
+        $('#genNotesRun').prop('disabled', false).text('Prepare AI');
         $('#genDescRun').prop('disabled', true);
-        $('#genNotesStatus').text('Preparing model…');
+        $('#genNotesStatus').text('Optional: downloads a local model (~1.9 GB) the first time.');
       }
     }
 
@@ -321,7 +373,14 @@ app.whenReady().then(() => {
     // -- Notes generation --
     $('#genNotesRun').on('click', function () {
       if (notesRunning) return;
-      if (!genReady) { $('#genNotesStatus').text('Model still loading — please wait.'); return; }
+      if (!genReady) {
+        $('#genNotesRun').prop('disabled', true).text('Preparing…');
+        $('#genNotesStatus').text('Preparing the private local model…');
+        ragIpc.invoke('rag:prepare').then(function (res) {
+          if (!res || !res.ok) $('#genNotesStatus').text('Could not prepare AI: ' + ((res && res.error) || 'unknown error'));
+        });
+        return;
+      }
       var title = ($('#tname').val() || '').trim();
       if (!title) { $('#genNotesStatus').text('Enter a task name first.'); return; }
       notesRunning = true;
@@ -466,7 +525,7 @@ app.whenReady().then(() => {
         var priority = parseInt($("#priority").val());
         var description = $("#description").val();
         var tags = $("#tags").val();
-        var notes = $("textarea")[1].value;
+        var notes = editor && typeof editor.getMarkdown === 'function' ? editor.getMarkdown() : '';
         var complete = false;
         $("#startError").html("<br><br>");
         $("#compError").html("<br><br>");
@@ -539,7 +598,8 @@ app.whenReady().then(() => {
           } else if (ls('platform') === "Local") {
             localFunctions.createUpdateFile("", ls('repoName') + "/" + datePath, stackJson, onWrite);
           }
-          window.location.replace("./stack.html");
+          $('#submitTask').prop('disabled', true).val(ls('createPage') === 'edit' ? 'Saving…' : 'Creating…');
+          navigateTo("./stack.html");
         }
       }
     });

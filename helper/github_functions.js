@@ -114,9 +114,7 @@ exports.getContent = function(token, username, filepath, repoName, callback){
   }).then((response) => {
     const isValid = response.status < 400;
     const body = response._bodyInit;
-    console.log(response.status);
     response.json().then((json) => {
-      console.log(json);
       if (isValid) {
         json['repoName'] = repoName;
         return callback(null, json);
@@ -191,13 +189,16 @@ exports.createUpdateFile = function(token, username, repoName, filename, fileCon
     return callback(null, "Successfully wrote " + filename);
   } else {
     this.checkFileExists(token, username, repoName, filename, function (err, exists){
+      if (err) return callback(err, null);
       var options = {
         method: 'PUT',
         headers: {
           'Authorization': auth_header,
         },
         body: {
-          'content': btoa(fileContent),
+          'content': typeof Buffer !== 'undefined'
+            ? Buffer.from(fileContent, 'utf8').toString('base64')
+            : btoa(unescape(encodeURIComponent(fileContent))),
           'message': filename
         }
       };

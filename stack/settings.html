@@ -33,10 +33,10 @@
                 </label>
             </div>
             <p class="card-subtitle">
-                Uses a native keyboard hook to count keystrokes system-wide.
+                While clocked in, Fastack samples system idle time and scrolling in the popup. Optionally, this native keyboard hook counts keystrokes system-wide.
                 The productivity report then distinguishes <strong>writing</strong> (typing) from <strong>reading</strong> (scrolling).
                 Requires <strong>Accessibility permission</strong> on macOS Sonoma+ (one-time system dialog).
-                Default is off — your keystroke content is never captured, only the count.
+                Default is off — key values, window titles, app names, screenshots, and typed content are never captured.
             </p>
             <span id="activityStatus" class="card-subtitle" style="color:#8b96a8">Disabled.</span>
         </section>
@@ -78,7 +78,7 @@
             </div>
             <p class="card-subtitle">
                 Index a folder of docs / code so the AI can pull related snippets when generating notes.
-                Off by default — enable if you have a dedicated docs folder.
+                Off by default — enable if you have a dedicated docs folder. Generative AI is local and its first use downloads approximately 1.9 GB.
             </p>
             <p id="ragCurrent" class="card-subtitle" style="color:#8b96a8">No folder indexed yet.</p>
             <div class="card-actions" id="ragControls">

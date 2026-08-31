@@ -51,7 +51,8 @@ exports.listFiles = function (token, path, callback) {
     accessToken: token
   });
   client.filesListFolder({ path: "/" + path }).then((response) => {
-    return callback(null, response.entries);
+    var payload = response.result || response;
+    return callback(null, payload.entries || []);
   }).catch((error) => {
     return callback(error, null);
   });
@@ -63,7 +64,8 @@ exports.checkFastackRepoExists = function (token, callback) {
   });
   console.log(Object.getOwnPropertyNames(client));
   client.filesListFolder({ path: "" }).then((response) => {
-    var folders = response.result.entries;
+    var payload = response.result || response;
+    var folders = payload.entries || [];
     var repoName = "";
     if (!folders) {
       return callback(null, "");

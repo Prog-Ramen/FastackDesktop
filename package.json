@@ -8,6 +8,8 @@
   "license": "MIT",
   "main": "main.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:integrations:live": "node test/live-backends.js",
     "start": "electron . --disable-gpu --disable-direct-composition",
     "dev": "FASTACK_DEV=1 electron . --disable-gpu --disable-direct-composition",
     "pack": "electron-builder --dir",

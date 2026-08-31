@@ -95,10 +95,10 @@ $(document).ready(function () {
         kbTrackingEnabled = on;
         if (on) {
             // Tell main to start the addon.
-            try { require('@electron/remote').ipcRenderer.send('keyboard:init'); } catch (e) {}
+            try { settingIpc.send('keyboard:init'); } catch (e) {}
             $('#activityStatus').text('Enabled (native addon).');
         } else {
-            try { require('@electron/remote').ipcRenderer.send('keyboard:stop'); } catch (e) {}
+            try { settingIpc.send('keyboard:stop'); } catch (e) {}
             $('#activityStatus').text('Disabled.');
         }
     });

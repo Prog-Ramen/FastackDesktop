@@ -1,4 +1,5 @@
 var stackFunctions = require('../helper/stack_functions');
+var intelligence = require('../helper/intelligence');
 var githubFunctions = require('../helper/github_functions');
 var dropboxFunctions = require('../helper/dropbox_functions');
 var gdriveFunctions = require('../helper/gdrive_functions');
@@ -174,7 +175,10 @@ __ipc.on('shortcut', function (_evt, key) {
         $('.task').first().hide('drop', { direction: 'up' }, 1000);
         setTimeout(function () {
           if (!pageAlive) return;
-          stack['complete'].push(stack['incomplete'][0]);
+          var completedTask = stack['incomplete'][0];
+          completedTask.completedAt = new Date().toISOString();
+          completedTask.completionSummary = intelligence.completionSummary(completedTask);
+          stack['complete'].push(completedTask);
           stack['incomplete'].shift();
           ls('stack', stack);
           stackFunctions.persistStack();

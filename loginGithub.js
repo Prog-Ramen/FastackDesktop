@@ -31,8 +31,8 @@ var TOKEN = "";
 /* Initial Page with github, dropbox, and google drive options */
 $(document).ready(function () {
 
-  $("#login input[type=submit]").click(function () {
-    $("input[type=submit]", $(this).parents("form")).removeAttr("clicked");
+  $("#login button[type=submit], #login input[type=submit]").click(function () {
+    $("button[type=submit], input[type=submit]", $(this).parents("form")).removeAttr("clicked");
     $(this).attr("clicked", "true");
   });
 
@@ -101,7 +101,7 @@ $(document).ready(function () {
 
   $('#login').on('submit', function (evt) {
     evt.preventDefault();
-    var buttonType = $("input[type=submit][clicked=true]").val();
+    var buttonType = $("button[type=submit][clicked=true], input[type=submit][clicked=true]").val();
     ls('platform', buttonType);
     [authorization_url, TOKEN_URL] = get_auth_urls(buttonType)
     fetch(authorization_url, {

@@ -105,6 +105,19 @@ exports.stop = function (callback) {
   var platform = ls('platform');
   var repo = ls('repoName') || 'local';
 
+  // Keep a local analytics mirror for instant reports on every backend. The
+  // cloud copy remains the source for cross-device sync; this cache contains
+  // the same privacy-preserving samples and avoids network-bound dashboards.
+  if (platform !== 'Local') {
+    localFunctions.getContent('', repo + '/' + datePath, function (_err, previous) {
+      var cached = [];
+      try { cached = previous ? JSON.parse(previous) : []; } catch (e) { cached = []; }
+      if (!Array.isArray(cached)) cached = [];
+      cached.push(session);
+      localFunctions.createUpdateFile('', repo + '/' + datePath, JSON.stringify(cached), function () {});
+    });
+  }
+
   // Read the current day file, append this session, write back. Same pattern
   // for every backend — content is always JSON text.
   var readAndAppend = function (getText, putText) {
@@ -123,7 +136,13 @@ exports.stop = function (callback) {
       function (done) {
         githubFunctions.getContent(ls('token'), ls('username'), datePath, repo, function (e, r) {
           if (e || !r) return done(e || new Error('nofile'), null);
-          try { done(null, atob((r.content || '').replace(/[^A-Za-z0-9+/=]/g, ''))); }
+          try {
+            var encoded = (r.content || '').replace(/[^A-Za-z0-9+/=]/g, '');
+            var decoded = typeof Buffer !== 'undefined'
+              ? Buffer.from(encoded, 'base64').toString('utf8')
+              : decodeURIComponent(escape(atob(encoded)));
+            done(null, decoded);
+          }
           catch (er) { done(er, null); }
         });
       },

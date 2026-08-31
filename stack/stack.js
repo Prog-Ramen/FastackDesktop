@@ -7,7 +7,7 @@ const electron = require('electron');
 const base64 = require('base-64');
 var ls = require('local-storage');
 var githubFunctions = require('../helper/github_functions');
-var {ipcRenderer} = remote;
+var {ipcRenderer} = electron;
 var cryptoHelper = require('../helper/crypto_helper');
 var conversions = require('../helper/conversions');
 var stackFunctions = require('../helper/stack_functions');
@@ -15,9 +15,16 @@ var screenCapture = require('../helper/screen_capture');
 var textAnalyzer = require('../helper/text_analyzer');
 var window = BrowserWindow.getFocusedWindow();
 
+function navigateTo(url) {
+    document.body.classList.add('page-leaving');
+    setTimeout(function () { window.location.replace(url); }, 110);
+}
+
 
 $(document).ready(function () {
-    setInterval(function(){ stackFunctions.stackSort()});
+    $('#backendPill').text(ls('platform') || 'Local');
+    // Keep ordering fresh without a zero-delay loop that monopolizes the renderer.
+    setInterval(function(){ stackFunctions.stackSort(); }, 30000);
     ls('currIndex', 0);
     // Recurring-task sweep: on load and every 60s. Spawns any templates whose
     // nextRunAt has passed. Safe to call repeatedly — noop if nothing due.
@@ -39,6 +46,13 @@ $(document).ready(function () {
     var stack = stackFunctions.generateFullStackHTML(ls('currIndex'))
     console.log(stack);
     $(".s1").append(stack);
+    if (!(ls('stack') && ls('stack').incomplete && ls('stack').incomplete.length)) {
+        $('.s1').html('<div class="stack-empty"><strong>No tasks yet</strong><p>Create a task to start your focus stack.</p><button id="emptyAdd" type="button">Create task</button></div>');
+    }
+    $(document).on('click', '#emptyAdd', function () { $('#addButton').trigger('click'); });
+    $('.fastack-toolbar').on('keydown', '[role=button]', function (evt) {
+        if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); $(this).trigger('click'); }
+    });
     $(".taskName").mouseover(function(){
         var $c = $(this).find('.header')
            .clone()
@@ -52,11 +66,11 @@ $(document).ready(function () {
         $c.remove();
     });
     $('#logout').click(function(){
-        window.location.replace('../home.html');
+        navigateTo('../home.html');
     });
     $('#addButton').click(function(){
         ls('createPage', 'add');
-        window.location.replace('./createTask.html');
+        navigateTo('./createTask.html');
     });
     $("body").on('click', '.task', function() {
         var id = this.id;
@@ -70,14 +84,21 @@ $(document).ready(function () {
         var oldId = savedTimer.id;
         stackFunctions.clockOut();
         clearInterval(oldId);
-        $('.s1').empty();
-        $(".s1").append(stackFunctions.generateFullStackHTML(numb));
+        var $stack = $('.s1');
+        $stack.addClass('is-switching');
+        $stack.find('.task').removeClass('is-selected');
+        $(this).addClass('is-selected');
+        setTimeout(function () {
+            $stack.empty().append(stackFunctions.generateFullStackHTML(numb));
+            requestAnimationFrame(function () { $stack.removeClass('is-switching'); });
+            // Restart through the full clock-in path so both the countdown and
+            // activity analytics follow the newly selected task.
+            if (wasClockedIn) stackFunctions.clockIn(0);
+        }, 90);
         // If we were clocked in, the task was moved to index 0 by
         // generateFullStackHTML.  Restore the timer so the countdown continues.
         if (wasClockedIn) {
             $('#timeButton').attr("src","../images/clocko.png");
-            var newTimer = stackFunctions.countdown(0);
-            ls('countdownTimer', { id: newTimer });
         }
     });
     $('#timeButton').click(function(){
@@ -90,10 +111,10 @@ $(document).ready(function () {
         }
     });
     $('#settingsButton').click(function(){
-        window.location.replace('./settings.html');
+        navigateTo('./settings.html');
     });
     $('#reportButton').click(function(){
-        window.location.replace('./report.html');
+        navigateTo('./report.html');
     });
     $(".taskName").mouseleave(function(){
         $(this).find('.header').css("text-overflow", "ellipsis");
@@ -112,7 +133,9 @@ $(document).ready(function () {
     function startActivityTracking() {
         scrollCount = 0;
         // Initialize the native addon if the user has enabled keyboard tracking.
-        try { ipcRenderer.send('keyboard:init'); } catch (e) {}
+        if (ls('keyboardTrackingEnabled')) {
+            try { ipcRenderer.send('keyboard:init'); } catch (e) {}
+        }
         activitySampleTimer = setInterval(function () {
             try {
                 ipcRenderer.invoke('keyboard:get-counts').then(function (counts) {

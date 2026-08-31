@@ -13,9 +13,9 @@
 <body class="draggable">
 <div class='container'>
     <div class="fastack-toolbar">
-      <img id="addButton" class="tb-icon" src="../images/add.png" alt="Add New Task" height="18" width="18">
-      <img id="timeButton" class="tb-icon" src="../images/clock.png" alt="Clock" height="20" width="20">
-      <span id="reportButton" class="tb-icon tb-svg" title="Productivity Report">
+      <img id="addButton" class="tb-icon" src="../images/add.png" alt="Add new task" title="Add task" tabindex="0" role="button" height="18" width="18">
+      <img id="timeButton" class="tb-icon" src="../images/clock.png" alt="Clock in" title="Clock in or out" tabindex="0" role="button" height="20" width="20">
+      <span id="reportButton" class="tb-icon tb-svg" title="Productivity report" aria-label="Productivity report" tabindex="0" role="button">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 17 L3 3"/>
           <path d="M3 17 L17 17"/>
@@ -24,8 +24,9 @@
           <rect x="14" y="12" width="2.5" height="3" fill="currentColor" stroke="none"/>
         </svg>
       </span>
-      <img id="settingsButton" class="tb-icon" src="../images/settings.png" alt="Settings" height="20" width="20">
-      <img id="logout" class="tb-icon tb-right" src="../images/logout.png" alt="Logout" height="20" width="20">
+      <img id="settingsButton" class="tb-icon" src="../images/settings.png" alt="Settings" title="Settings" tabindex="0" role="button" height="20" width="20">
+      <span class="backend-pill" id="backendPill"></span>
+      <img id="logout" class="tb-icon" src="../images/logout.png" alt="Sign out" title="Sign out" tabindex="0" role="button" height="20" width="20">
     </div>
     <div class="stack s1">
     </div>

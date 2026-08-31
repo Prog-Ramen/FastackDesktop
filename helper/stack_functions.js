@@ -216,7 +216,7 @@ exports.stackSort = function(){
     });
     stack.splice(first, count);
     stack = overdue.concat(stack);
-    ls('stack', {'incomplete': stack, 'complete': ls('stack')['complete']});
+    ls('stack', {'incomplete': stack, 'complete': ls('stack')['complete'], 'templates': ls('stack')['templates'] || []});
     return stack;
 }
 
@@ -388,7 +388,7 @@ exports.countdown = function(index){
             var now = Date.now();
             var elapsed = now - sessionStart;
             incomplete[index].timeTaken = elapsed;
-            ls('stack', { 'incomplete': incomplete, 'complete': s['complete'] || [] });
+            ls('stack', { 'incomplete': incomplete, 'complete': s['complete'] || [], 'templates': s['templates'] || [] });
 
             var statusEl = document.getElementById("status");
             if (!statusEl) return; // e.g. we're on createTask.html — nothing to render into
@@ -404,7 +404,7 @@ exports.countdown = function(index){
 exports.clockIn = function(index){
     var stack = ls('stack');
     var task = stack && stack['incomplete'] && stack['incomplete'][index];
-    if (!task) return; // nothing to clock in on
+    if (!task) return false; // nothing to clock in on
     var timer = ls('countdownTimer') || { id: 0 };
     if (timer.id == 0){
         var id = 0;
@@ -412,14 +412,22 @@ exports.clockIn = function(index){
         ls('countdownTimer', { id: id });
         try { activityTracker.start(task.taskName); } catch (e) { /* tracker must not block clock-in */ }
     }
+    var clockButton = typeof document !== 'undefined' && document.getElementById('timeButton');
+    if (clockButton) clockButton.setAttribute('src', '../images/clocko.png');
+    return true;
 }
 
 exports.clockOut = function(){
-    clearInterval(ls('countdownTimer')['id']);
-    var top = ls('stack')['incomplete'][0];
+    var timer = ls('countdownTimer') || { id: 0 };
+    clearInterval(timer.id);
+    var stack = ls('stack') || { incomplete: [] };
+    var top = stack['incomplete'][0];
     if (top) {
-        document.getElementById("status").innerHTML = '<h2>' + this.generateStatus(top) + '</h2>';
+        var status = typeof document !== 'undefined' && document.getElementById("status");
+        if (status) status.innerHTML = '<h2>' + this.generateStatus(top) + '</h2>';
     }
+    var clockButton = typeof document !== 'undefined' && document.getElementById('timeButton');
+    if (clockButton) clockButton.setAttribute('src', '../images/clock.png');
     ls('countdownTimer', {'id': 0});
     // Persist the tracked time so it survives a restart.
     this.persistStack();

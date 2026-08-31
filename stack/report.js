@@ -14,6 +14,7 @@
 
 var ls = require('local-storage');
 var localFunctions = require('../helper/local_functions');
+var intelligence = require('../helper/intelligence');
 
 var SAMPLE_MS = 5000;              // Must match activity_tracker.SAMPLE_MS
 var CATEGORY_COLORS = {
@@ -25,7 +26,6 @@ var CATEGORY_COLORS = {
 };
 
 function loadSessions() {
-  if (ls('platform') !== 'Local') return null;
   try { return localFunctions.readAllActivity(ls('repoName') || 'local'); }
   catch (e) { return []; }
 }
@@ -144,20 +144,13 @@ function render(range) {
   var all = loadSessions();
   var $empty = $('#emptyState');
   var $content = $('#content');
-  if (all === null) {
-    $empty.text('Reports are currently available in Local mode. Sign in with a cloud backend to see cloud sync of activity coming soon.').show();
-    $content.hide();
-    return;
-  }
+  if (all === null) all = [];
   var scoped = filterRange(all, range);
   var agg = aggregate(scoped);
+  $('#weeklyReviewBlock').toggle(range === 'week');
 
-  if (!agg.focusMs && !agg.sessions.length) {
-    $empty.text('No activity recorded for this range yet. Clock into a task and the tracker will capture idle/active metadata locally.').show();
-    $content.hide();
-    return;
-  }
-  $empty.hide();
+  if (!agg.focusMs && !agg.sessions.length) $empty.text('No activity samples for this range yet. Task insights below are still available.').show();
+  else $empty.hide();
   $content.show();
 
   $('#kpiFocus').text(formatDuration(agg.focusMs));
@@ -172,9 +165,12 @@ function render(range) {
   var catData = catLabels.map(function (k) { return Math.round(agg.byCategory[k] / 60000); });
   var catColors = catLabels.map(function (k) { return CATEGORY_COLORS[k] || '#8b96a8'; });
   if (categoryChart) categoryChart.destroy();
+  var chartValues = catData.length ? catData : [1];
+  var chartLabels = catLabels.length ? catLabels : ['No activity'];
+  var chartColors = catColors.length ? catColors : ['#303844'];
   categoryChart = new Chart(document.getElementById('categoryChart').getContext('2d'), {
     type: 'doughnut',
-    data: { labels: catLabels, datasets: [{ data: catData, backgroundColor: catColors, borderWidth: 0, hoverOffset: 4 }] },
+    data: { labels: chartLabels, datasets: [{ data: chartValues, backgroundColor: chartColors, borderWidth: 0, hoverOffset: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false,
       cutout: '68%',
@@ -202,6 +198,49 @@ function render(range) {
       '</div>'
     );
   });
+
+  renderIntelligence(scoped);
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, function (c) { return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]; });
+}
+
+function hourLabel(hour) {
+  if (hour === null || hour === undefined) return 'Not enough history yet';
+  var suffix = hour >= 12 ? 'PM' : 'AM';
+  var display = hour % 12 || 12;
+  return 'Your strongest focus window starts around ' + display + ' ' + suffix + '.';
+}
+
+function renderIntelligence(rows) {
+  var stack = ls('stack') || { incomplete: [], complete: [] };
+  var analysis = intelligence.analyzeSessions(rows);
+  var review = intelligence.weeklyReview(stack, rows);
+  $('#focusInsight').text(rows.length ? analysis.focusScore + '/100 · ' + analysis.activePct + '% of observed time was active.' : 'Clock into tasks to build a private focus-quality baseline.');
+  $('#interruptionInsight').text(rows.length ? analysis.sessionCount + ' sessions · ' + analysis.interruptionRisk + ' fragmentation risk.' : 'No interruption pattern available yet.');
+  var activityLabels = { write: 'writing', read: 'reading', browse: 'browsing', idle: 'idle', other: 'in mixed activity' };
+  $('#patternInsight').text(hourLabel(analysis.bestHour) + (analysis.dominantCategory ? ' Most time is spent ' + activityLabels[analysis.dominantCategory] + '.' : ''));
+  $('#estimateInsight').text(review.estimateAccuracy === null ? 'Complete estimated tasks to compare planned and actual time.' : 'Actual time averages ' + review.estimateAccuracy + '% of the original estimate.');
+
+  var ranked = intelligence.rankTasks(stack.incomplete || []).slice(0, 3);
+  $('#nextTaskList').html(ranked.length ? ranked.map(function (row, i) {
+    return '<div class="insight-row"><span><b>' + (i + 1) + '.</b> ' + escapeHtml(row.task.taskName) + '</span><small>' + escapeHtml(row.reason) + '</small></div>';
+  }).join('') : '<div class="insight-empty">Your task list is clear.</div>');
+
+  var stale = intelligence.findStaleTasks(stack.incomplete || []).slice(0, 5);
+  $('#staleTaskList').html(stale.length ? stale.map(function (row) {
+    return '<div class="insight-row"><span>' + escapeHtml(row.task.taskName) + '</span><small>' + escapeHtml(row.suggestion) + '</small></div>';
+  }).join('') : '<div class="insight-empty">No stale or overdue tasks.</div>');
+
+  var reviewText = review.completed + ' task' + (review.completed === 1 ? '' : 's') + ' completed this week. Focus quality is ' + review.focusScore + '/100. ' + review.stale + ' task' + (review.stale === 1 ? '' : 's') + ' need attention.';
+  if (review.bestHour !== null) reviewText += ' ' + hourLabel(review.bestHour);
+  $('#weeklyReview').text(reviewText).data('review', reviewText);
+
+  var summaries = (stack.complete || []).slice().reverse().slice(0, 5);
+  $('#completionSummaries').html(summaries.length ? summaries.map(function (task) {
+    return '<div class="insight-row"><span>' + escapeHtml(task.completionSummary || intelligence.completionSummary(task)) + '</span></div>';
+  }).join('') : '<div class="insight-empty">Completed tasks will be summarized here.</div>');
 }
 
 $(document).ready(function () {
@@ -210,6 +249,21 @@ $(document).ready(function () {
     $('.tab').removeClass('active');
     $(this).addClass('active');
     render($(this).data('range'));
+  });
+  $('#taskSearch').on('input', function () {
+    var query = $(this).val().trim();
+    var stack = ls('stack') || { incomplete: [], complete: [] };
+    var $results = $('#searchResults');
+    if (query.length < 2) { $results.hide().empty(); return; }
+    var hits = intelligence.searchTasks(query, (stack.incomplete || []).concat(stack.complete || []), 6);
+    $results.html(hits.length ? hits.map(function (hit) {
+      return '<div class="insight-row"><span>' + escapeHtml(hit.task.taskName) + '</span><small>' + Math.round(hit.score * 100) + '% match</small></div>';
+    }).join('') : '<div class="insight-empty">No related tasks found.</div>').show();
+  });
+  $('#copyReview').on('click', function () {
+    var text = $('#weeklyReview').data('review') || $('#weeklyReview').text();
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+    $(this).text('Copied');
   });
   render('today');
 });

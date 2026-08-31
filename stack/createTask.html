@@ -8,31 +8,56 @@
 </head>
 <body class="draggable">
 
-<div>
+<div class="task-create-shell">
+    <header class="task-create-header">
+        <button type="button" id="headerBack" class="icon-button" aria-label="Back to tasks">&#8592;</button>
+        <div>
+            <p id="createTaskTitle">New Task</p>
+            <p class="task-create-subtitle">Capture the task now. Add detail only when it helps.</p>
+        </div>
+        <span class="create-status" id="createStatus">Draft</span>
+    </header>
     <div class="rows">
         <div class="column">
-            <br>
-            <p id="createTaskTitle">New Task</p>
             <form id="createNewTask">
                 <div class="tab">
-                    <div class="taskInput">
-                        <label for="tname">Task Name </label><br><br>
-                        <input id="tname" type="text" name="taskname">
+                    <section class="form-card form-card-primary">
+                    <div class="taskInput field-group">
+                        <label for="tname">What needs doing?</label>
+                        <input id="tname" type="text" name="taskname" placeholder="e.g. Review launch checklist" autocomplete="off">
                     </div>
-                    <span id="nameError" class="error"><br></span>
-                    <div id="ragPanel" class="rag-panel" style="display:none;">
-                        <div class="rag-header">Related from your docs</div>
-                        <div id="ragResults"></div>
-                    </div>
-                    <div id="genNotesPanel" class="rag-panel">
-                        <div class="rag-header">
-                            Suggested notes
-                            <button type="button" id="genNotesRun" class="rag-use-btn">Generate</button>
-                            <button type="button" id="genNotesUse" class="rag-use-btn" style="display:none;">Use this</button>
+                    <span id="nameError" class="error"></span>
+                    <div class="quick-fields">
+                        <div class="field-group compact-field">
+                            <label for="priority">Priority</label>
+                            <input id="priority" type="number" value="1" min="1" max="100">
                         </div>
-                        <div id="genNotesStatus" class="rag-empty">Checking model…</div>
-                        <div id="genNotesOutput" class="rag-gen-output"></div>
+                        <div class="field-group duration-field">
+                            <label for="hours">Estimate</label>
+                            <div><input id="hours" type="number" value="0" min="0" max="1000"><span>h</span><input id="minutes" type="number" value="0" min="0" max="59"><span>m</span></div>
+                        </div>
                     </div>
+                    <span id="timeError" class="error"></span>
+                    <span id="priorityError" class="error"></span>
+                    <div class="taskInput field-group">
+                        <label for="description">Description <small>optional</small></label>
+                        <textarea id="description" class="boxInput" name="description" placeholder="A short outcome or next step"></textarea>
+                    </div>
+                    <div class="taskInput field-group">
+                        <label for="tags">Tags <small>optional</small></label>
+                        <input id="tags" type="text" name="tags" placeholder="#work, #planning">
+                    </div>
+                    <span id="tagError" class="error"></span>
+                    <div id="taskCoach" class="task-coach" style="display:none;">
+                        <div id="estimateSuggestion"></div>
+                        <div id="similarTasks"></div>
+                        <button type="button" id="applyEstimate" class="coach-action" style="display:none;">Use estimate</button>
+                        <button type="button" id="decomposeTask" class="coach-action">Break into steps</button>
+                    </div>
+                    </section>
+                    <details class="form-card optional-card">
+                      <summary><span>Schedule</span><small>Dates and recurrence</small></summary>
+                      <div class="details-body">
                     <div class="taskInput" id="start" style="display:none;">
                         <label for="startDate">Start Date</label>
                         <input id="startDate" type="datetime-local">
@@ -41,13 +66,11 @@
                         <label for="compDate">Completion Date</label>
                         <input id="compDate" type="datetime-local">
                     </div>
-                    <br>
                     <div class="taskInput">
-                        <input type="checkbox" id="dates"><p style="display:inline">  Add Start and Completion Dates</p>
+                        <label class="check-row"><input type="checkbox" id="dates"><span>Add start and completion dates</span></label>
                     </div>
-                    <br>
                     <div class="taskInput">
-                        <input type="checkbox" id="recurring"><p style="display:inline">  Recurring task</p>
+                        <label class="check-row"><input type="checkbox" id="recurring"><span>Recurring task</span></label>
                     </div>
                     <div id="recurringPanel" class="rag-panel" style="display:none;">
                         <div class="rag-header">Schedule</div>
@@ -79,21 +102,23 @@
                         </div>
                         <div id="recurNext" class="rag-empty" style="margin-top:4px;">Next run: —</div>
                     </div>
-                    <br>
-                    <label for="compDate">Estimated Time Required</label><br><br><br>
-                    <div class="centerTaskInput">
-                        <input align="left" id="hours" type="number" value="0" min="0" max="1000"> hours<input align="left" id="minutes" type="number" value="0" min="0" max="59"> minutes<br>
+                      </div>
+                    </details>
+                    <details class="form-card optional-card">
+                      <summary><span>AI assistance</span><small>Suggestions from local context</small></summary>
+                      <div class="details-body">
+                    <div id="ragPanel" class="rag-panel" style="display:none;">
+                        <div class="rag-header">Related from your docs</div>
+                        <div id="ragResults"></div>
                     </div>
-                    <span id="timeError" class="error"><br><br></span>
-                    <label for="priority">Priority (Number between 1 and 100)</label><br>
-                    <div class="centerTaskInput">
-                        <input id="priority" align="right" type="number" value="1" min="1" max="100">
-                    </div>
-                    <span id="priorityError" class="error"><br><br></span>
-                    <br>
-                    <div class="taskInput">
-                        <label for="description">Description </label><br><br>
-                        <textarea id="description" class="boxInput" name="description"></textarea><br><br>
+                    <div id="genNotesPanel" class="rag-panel">
+                        <div class="rag-header">
+                            Suggested notes
+                            <button type="button" id="genNotesRun" class="rag-use-btn">Generate</button>
+                            <button type="button" id="genNotesUse" class="rag-use-btn" style="display:none;">Use this</button>
+                        </div>
+                        <div id="genNotesStatus" class="rag-empty">Checking model…</div>
+                        <div id="genNotesOutput" class="rag-gen-output"></div>
                     </div>
                     <div id="genDescPanel" class="rag-panel">
                         <div class="rag-header">
@@ -104,23 +129,23 @@
                         <div id="genDescStatus" class="rag-empty">Generate or write notes first.</div>
                         <div id="genDescOutput" class="rag-gen-output"></div>
                     </div>
-                    <div class="taskInput">
-                        <label for="tags">Tags </label><br>
-                        <input id="tags" type="text" name="tags">
-                    </div>
-                    <span id="tagError" class="error"><br><br></span>
-                    <div class="taskInput">
-                        <label for="description">Notes </label><br><br><br>
+                      </div>
+                    </details>
+                    <details class="form-card optional-card notes-card">
+                      <summary><span>Notes</span><small>Markdown supported</small></summary>
+                      <div class="details-body">
+                    <div class="taskInput field-group">
                         <div id="editSection">
                         </div>
                     </div>
-                    <br><br>
+                      </div>
+                    </details>
                 </div>
-                <span id="error" class="error"><br><br></span>
-                <br>
-                <br>
-                <center><input type="submit" id="submitTask" value="Create Task"></center>
-                <center><input type="submit" id="goBack" class="btn-ghost" value="Go Back"></center>
+                <span id="error" class="error form-error"></span>
+                <div class="sticky-actions">
+                    <input type="submit" id="goBack" class="btn-ghost" value="Cancel">
+                    <input type="submit" id="submitTask" value="Create Task">
+                </div>
             </form>
         </div>
     </div>

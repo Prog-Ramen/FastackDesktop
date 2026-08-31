@@ -233,21 +233,20 @@ try {
 
 const rag = require('./helper/rag');
 
-// Eagerly download + load the generator on startup so it's ready before the
-// user needs it. Progress fans out to every open window so any renderer can
-// display it. The download is ~1.88GB one-time; subsequent launches skip
-// straight to loading from the cached files (5-15s).
-try {
-  rag.preload((progress) => {
-    try {
-      BrowserWindow.getAllWindows().forEach((w) => {
-        if (w && !w.isDestroyed() && w.webContents && !w.webContents.isDestroyed()) {
-          w.webContents.send('rag:gen-progress', progress);
-        }
-      });
-    } catch (e) {}
-  });
-} catch (e) { console.log('[fastack] preload skipped:', e.message); }
+// The generator is intentionally prepared on demand. Eager startup would
+// surprise new users with a ~1.9 GB download before they choose an AI action.
+ipcMain.handle('rag:prepare', async () => {
+  try {
+    rag.preload((progress) => {
+      try {
+        BrowserWindow.getAllWindows().forEach((w) => {
+          if (w && !w.isDestroyed() && w.webContents && !w.webContents.isDestroyed()) w.webContents.send('rag:gen-progress', progress);
+        });
+      } catch (e) {}
+    });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message || String(e) }; }
+});
 
 ipcMain.handle('rag:get-meta', () => { try { return rag.getMeta(); } catch (e) { return null; } });
 ipcMain.handle('rag:is-gen-ready', () => { try { return !!rag.isGeneratorReady(); } catch (e) { return false; } });

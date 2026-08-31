@@ -34,6 +34,39 @@
           <div class="kpi"><div class="kpi-value" id="kpiStreak">0d</div><div class="kpi-label">Streak</div></div>
         </div>
 
+        <div class="insight-search">
+          <input id="taskSearch" type="search" placeholder="Find tasks by meaning…">
+          <div id="searchResults" class="insight-list" style="display:none"></div>
+        </div>
+
+        <div class="insight-grid">
+          <div class="insight-card"><div class="chart-label">Focus quality</div><div id="focusInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Interruptions</div><div id="interruptionInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Your pattern</div><div id="patternInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Estimate calibration</div><div id="estimateInsight" class="insight-copy"></div></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Recommended next</div>
+          <div id="nextTaskList" class="insight-list"></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Tasks needing attention</div>
+          <div id="staleTaskList" class="insight-list"></div>
+        </div>
+
+        <div class="chart-block" id="weeklyReviewBlock" style="display:none;">
+          <div class="chart-label">Weekly review</div>
+          <div id="weeklyReview" class="review-copy"></div>
+          <button id="copyReview" class="report-action">Copy review</button>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Recent accomplishments</div>
+          <div id="completionSummaries" class="insight-list"></div>
+        </div>
+
         <div class="chart-block">
           <div class="chart-label">By activity type</div>
           <div class="chart-canvas-wrap"><canvas id="categoryChart"></canvas></div>
