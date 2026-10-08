@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "title": "Fastack",
+  "summary": "A context-switching task manager that prioritizes a daily stack and records focused time.",
+  "preview": {
+    "type": "iframe",
+    "url": "/previews/fastack/",
+    "image": "images/va@2x.png"
+  },
+  "download": "https://github.com/Prog-Ramen/FastackDesktop/releases/latest"
+}
