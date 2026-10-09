@@ -5,7 +5,27 @@ var dropboxFunctions = require('./dropbox_functions');
 var gdriveFunctions = require('./gdrive_functions');
 var localFunctions = require('./local_functions');
 var activityTracker = require('./activity_tracker');
-ls('countdownTimer', {'id': 0});
+var profileCache = require('./profile_cache');
+var taskMerge = require('./task_merge');
+var taskLock = require('./task_lock');
+// Electron returns Node Timeout objects, which cannot be serialized safely.
+var countdownTimerHandle = null;
+
+function taskId(task) {
+    if (!task.taskId) task.taskId = 'task_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+    return task.taskId;
+}
+function deviceId() {
+    var id = ls('fastackDeviceId');
+    if (!id) { id = 'device_' + Math.random().toString(36).slice(2); ls('fastackDeviceId', id); }
+    return id;
+}
+
+function findTaskIndexById(stack, id) {
+    var tasks = stack && stack.incomplete || [];
+    for (var i = 0; i < tasks.length; i++) if (taskId(tasks[i]) === id) return i;
+    return -1;
+}
 
 // Persist the current in-memory stack (ls('stack')) to whichever backend is active,
 // under today's <year>/<month>/<day> path. Called after any stack mutation that isn't
@@ -15,22 +35,24 @@ exports.persistStack = function (callback) {
   var d = new Date();
   var datePath = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
   var stackJson = JSON.stringify(ls('stack'));
-  var platform = ls('platform');
-  if (platform === 'Github') {
-    githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), datePath, stackJson, cb);
-  } else if (platform === 'Dropbox') {
-    dropboxFunctions.createUpdateFile(ls('token'), ls('repoName') + '/' + datePath, stackJson, cb);
-  } else if (platform === 'Google') {
-    gdriveFunctions.createUpdateFile(ls('token'), ls('repoName') + '/' + datePath, stackJson, cb);
-  } else if (platform === 'Local') {
-    localFunctions.createUpdateFile('', ls('repoName') + '/' + datePath, stackJson, cb);
-  } else {
+  var platform = String(ls('platform') || '').toLowerCase();
+  profileCache.saveActive(ls('stack'));
+  // Always maintain the local snapshot, even while a cloud provider is active.
+  // This makes offline recovery and provider-to-provider merging reliable.
+  localFunctions.createUpdateFile('', 'local/' + datePath, stackJson, function (localErr) {
+    if (localErr) return cb(localErr);
+    if (platform === 'github') return githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), datePath, stackJson, cb);
+    if (platform === 'dropbox') return dropboxFunctions.createUpdateFile(ls('token'), ls('repoName') + '/' + datePath, stackJson, cb);
+    if (platform === 'google') return gdriveFunctions.createUpdateFile(ls('token'), ls('repoName') + '/' + datePath, stackJson, cb);
+    if (platform === 'local') return localFunctions.createUpdateFile('', ls('repoName') + '/' + datePath, stackJson, cb);
     return cb(null);
-  }
+  });
 };
 
 exports.createTask = function(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours, timeMins, priority, description, tags, notes, timeTaken, complete) {
+    var now = new Date().toISOString();
     var taskObject = {
+        taskId: 'task_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9),
         taskName: taskName,
         startDate: startDate,
         creationDate: creationDate,
@@ -44,6 +66,9 @@ exports.createTask = function(taskName, startDate, creationDate, completionDate,
         notes: notes,
         timeTaken: timeTaken,
         complete: complete
+        ,updatedAt: now
+        ,sourceDevice: deviceId()
+        ,fieldRevisions: { description: { updatedAt: now, source: deviceId(), value: description || '' } }
     }
     return taskObject;
 }
@@ -287,7 +312,9 @@ exports.generateTaskHTML = function(index, translate, decrypted,overhead, status
     } else {
         color = "#6b7383;";        // slate (todo/upcoming)
     }
-    return `<div id="t${index}" class="task taskName" style="background: ${color}${translate}; opacity: ${index != current?1/(Math.abs(current-index)+1):0.98}">` +
+    // Keep depth styling subtle and readable on the transparent canvas.
+    var depthOpacity = index != current ? Math.max(0.90, 1 / (Math.abs(current - index) + 1)) : 0.99;
+    return `<div id="t${index}" class="task taskName" style="background: ${color}${translate}; opacity: ${depthOpacity}">` +
             `<table align="center" ${index>current?"style='position:absolute; top: "+ -overhead*1.1+"vh;'":""}>
             <tr>
               <th><h2 class="header">${decrypted['taskName']}</h2></th>
@@ -358,15 +385,14 @@ exports.generateStatus = function(decrypted_task){
     return status;
 }
 
-exports.countdown = function(index){
+exports.countdown = function(index, clockState){
     var stackNow = ls('stack');
     var task = stackNow && stackNow['incomplete'] && stackNow['incomplete'][index];
     if (!task) return 0; // nothing to time; caller stores 0 and skips
+    var id = taskId(task);
     var durationMs = (parseInt(task.timeHours) || 0) * (1000 * 60 * 60) + (parseInt(task.timeMins) || 0) * (1000 * 60);
-    var alreadyTakenMs = parseInt(task.timeTaken) || 0;
+    var state = clockState || { taskId: id, startedAt: Date.now(), baseTimeTaken: parseInt(task.timeTaken) || 0 };
     var countUp = durationMs <= 0;
-    var sessionStart = Date.now() - alreadyTakenMs;
-    var dt = sessionStart + durationMs;
 
     var render = function (ms) {
         var neg = ms < 0;
@@ -380,24 +406,28 @@ exports.countdown = function(index){
     // A single unhandled error inside setInterval bubbles as an uncaught error
     // on every subsequent tick — enough to make the popup feel dead. Wrap the
     // whole body and no-op when the DOM element isn't on this page.
-    var x = setInterval(function () {
+    var tick = function () {
         try {
             var s = ls('stack');
             var incomplete = s && s['incomplete'];
-            if (!incomplete || !incomplete[index]) return;
+            var liveIndex = findTaskIndexById(s, id);
+            if (!incomplete || liveIndex < 0) return;
             var now = Date.now();
-            var elapsed = now - sessionStart;
-            incomplete[index].timeTaken = elapsed;
+            var elapsed = (parseInt(state.baseTimeTaken) || 0) + Math.max(0, now - state.startedAt);
+            incomplete[liveIndex].timeTaken = elapsed;
             ls('stack', { 'incomplete': incomplete, 'complete': s['complete'] || [], 'templates': s['templates'] || [] });
 
-            var statusEl = document.getElementById("status");
+            var taskEl = document.getElementById('t' + liveIndex);
+            var statusEl = taskEl && taskEl.querySelector('#status');
             if (!statusEl) return; // e.g. we're on createTask.html — nothing to render into
-            var display = countUp ? elapsed : (dt - now);
+            var display = countUp ? elapsed : (durationMs - elapsed);
             statusEl.innerHTML = '<h3 id="inside">' + render(display) + '</h3>';
             var inside = document.getElementById("inside");
             if (inside) inside.classList.add("blink_me");
-        } catch (e) { /* keep the timer alive */ }
-    }, 1000);
+        } catch (e) { console.error('[fastack] timer tick failed:', e); }
+    };
+    tick();
+    var x = setInterval(tick, 1000);
     return x;
 }
 
@@ -405,11 +435,23 @@ exports.clockIn = function(index){
     var stack = ls('stack');
     var task = stack && stack['incomplete'] && stack['incomplete'][index];
     if (!task) return false; // nothing to clock in on
-    var timer = ls('countdownTimer') || { id: 0 };
-    if (timer.id == 0){
-        var id = 0;
-        try { id = this.countdown(index) || 0; } catch (e) { id = 0; }
-        ls('countdownTimer', { id: id });
+    var id = taskId(task);
+    var lockResult = taskLock.acquire(task, 'timer');
+    if (!lockResult.ok) return false;
+    var state = ls('countdownTimer') || { active: false };
+    if (state.active && state.taskId !== id) exports.clockOut();
+    if (!countdownTimerHandle){
+        if (task.timerHandoff) { delete task.timerHandoff; ls('stack', stack); }
+        state = state.active && state.taskId === id ? state : {
+            active: true, taskId: id, startedAt: Date.now(), baseTimeTaken: parseInt(task.timeTaken) || 0
+        };
+        ls('stack', stack);
+        state.sessionId = state.sessionId || ('session_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2));
+        state.sourceDevice = deviceId();
+        ls('countdownTimer', state);
+        try { exports.persistStack(); } catch (e) {}
+        try { countdownTimerHandle = exports.countdown(index, state) || null; } catch (e) { console.error('[fastack] clock-in failed:', e); countdownTimerHandle = null; }
+        if (!countdownTimerHandle) ls('countdownTimer', { active: false });
         try { activityTracker.start(task.taskName); } catch (e) { /* tracker must not block clock-in */ }
     }
     var clockButton = typeof document !== 'undefined' && document.getElementById('timeButton');
@@ -417,22 +459,66 @@ exports.clockIn = function(index){
     return true;
 }
 
-exports.clockOut = function(){
-    var timer = ls('countdownTimer') || { id: 0 };
-    clearInterval(timer.id);
+exports.clockOut = function(callback){
+    var priorState = ls('countdownTimer') || {};
+    if (countdownTimerHandle) clearInterval(countdownTimerHandle);
+    countdownTimerHandle = null;
     var stack = ls('stack') || { incomplete: [] };
-    var top = stack['incomplete'][0];
-    if (top) {
+    var priorIndex = priorState.taskId ? findTaskIndexById(stack, priorState.taskId) : -1;
+    var priorTask = priorIndex >= 0 ? stack.incomplete[priorIndex] : null;
+    if (priorTask && priorState.startedAt) {
+        var duration = Math.max(0, Date.now() - priorState.startedAt);
+        priorTask.timeSessions = priorTask.timeSessions || [];
+        if (!priorTask.timeSessions.some(function (s) { return s.sessionId === priorState.sessionId; })) priorTask.timeSessions.push({ sessionId: priorState.sessionId || ('session_' + Date.now()), startedAt: priorState.startedAt, stoppedAt: Date.now(), durationMs: duration, sourceDevice: priorState.sourceDevice || deviceId() });
+        priorTask.timeTaken = (parseInt(priorState.baseTimeTaken) || 0) + duration;
+        ls('stack', stack);
+        taskLock.release(priorTask);
+    }
+    var priorTaskEl = typeof document !== 'undefined' && priorIndex >= 0 && document.getElementById('t' + priorIndex);
+    var priorStatus = priorTaskEl && priorTaskEl.querySelector('#status');
+    if (priorStatus && priorTask) priorStatus.innerHTML = '<h2>' + exports.generateStatus(priorTask) + '</h2>';
+    var selected = stack['incomplete'][ls('currIndex') || 0];
+    if (selected) {
         var status = typeof document !== 'undefined' && document.getElementById("status");
-        if (status) status.innerHTML = '<h2>' + this.generateStatus(top) + '</h2>';
+        if (status) status.innerHTML = '<h2>' + exports.generateStatus(selected) + '</h2>';
     }
     var clockButton = typeof document !== 'undefined' && document.getElementById('timeButton');
     if (clockButton) clockButton.setAttribute('src', '../images/clock.png');
-    ls('countdownTimer', {'id': 0});
+    ls('countdownTimer', { active: false });
     // Persist the tracked time so it survives a restart.
-    this.persistStack();
+    exports.persistStack(callback || function () {});
     try { activityTracker.stop(); } catch (e) { /* noop */ }
 }
+
+exports.transferTimer = function (callback) {
+    var state = ls('countdownTimer') || {}, stack = ls('stack') || { incomplete: [] };
+    var index = state.taskId ? findTaskIndexById(stack, state.taskId) : -1, task = index >= 0 ? stack.incomplete[index] : null;
+    if (!task || !state.active) return false;
+    var now = Date.now(), elapsed = Math.max(0, now - (state.startedAt || now));
+    task.timeTaken = (parseInt(state.baseTimeTaken) || 0) + elapsed; task.timeSessions = task.timeSessions || [];
+    if (!state.sessionId || !task.timeSessions.some(function (s) { return s.sessionId === state.sessionId; })) task.timeSessions.push({ sessionId: state.sessionId || ('session_' + now), startedAt: state.startedAt, stoppedAt: now, durationMs: elapsed, sourceDevice: state.sourceDevice });
+    task.timerHandoff = { taskId: task.taskId, accumulatedMs: task.timeTaken, fromDevice: state.sourceDevice, transferredAt: new Date(now).toISOString() };
+    if (countdownTimerHandle) clearInterval(countdownTimerHandle); countdownTimerHandle = null; ls('countdownTimer', { active: false }); taskLock.release(task); ls('stack', stack);
+    try { activityTracker.stop(); } catch (e) {} exports.persistStack(callback || function () {}); return true;
+};
+
+exports.isClockedIn = function () {
+    var state = ls('countdownTimer') || {};
+    return !!state.active;
+};
+
+exports.restoreClock = function () {
+    var state = ls('countdownTimer') || {};
+    if (!state.active || !state.taskId) return false;
+    var stack = ls('stack');
+    var index = findTaskIndexById(stack, state.taskId);
+    if (index < 0) { ls('countdownTimer', { active: false }); return false; }
+    if (!countdownTimerHandle) countdownTimerHandle = exports.countdown(index, state) || null;
+    try { activityTracker.start(stack.incomplete[index].taskName); } catch (e) {}
+    var clockButton = typeof document !== 'undefined' && document.getElementById('timeButton');
+    if (clockButton) clockButton.setAttribute('src', '../images/clocko.png');
+    return !!countdownTimerHandle;
+};
 
 /**
  * Pass keyboard/mouse activity signals to the tracker.

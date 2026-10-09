@@ -27,8 +27,12 @@ exports.getContent = function (token, filepath, callback) {
     accessToken: token
   });
   client.filesDownload({ path: filepath }).then((response) => {
+    console.log('[fastack] Dropbox download:', filepath);
     var payload = response.result || response;
     var binary = payload.fileBinary;
+    if (!binary && payload.fileBlob && typeof payload.fileBlob.text === 'function') {
+      return payload.fileBlob.text().then(function (text) { callback(null, text); });
+    }
     if (binary && typeof binary !== 'string') {
       // Buffer or Uint8Array — decode to utf-8 so callers can JSON.parse directly.
       try {
@@ -50,8 +54,10 @@ exports.listFiles = function (token, path, callback) {
   client = new Dropbox.Dropbox({
     accessToken: token
   });
-  client.filesListFolder({ path: "/" + path }).then((response) => {
+  var normalizedPath = "/" + String(path || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  client.filesListFolder({ path: normalizedPath === '/' ? '' : normalizedPath }).then((response) => {
     var payload = response.result || response;
+    console.log('[fastack] Dropbox list:', normalizedPath || '/', 'entries:', (payload.entries || []).length);
     return callback(null, payload.entries || []);
   }).catch((error) => {
     return callback(error, null);
@@ -97,9 +103,42 @@ exports.createUpdateFile = function (token, filename, fileContent, callback) {
   client = new Dropbox.Dropbox({
     accessToken: token
   });
-  client.filesUpload({ contents: fileContent, path: "/" + filename, mode: 'overwrite' }).then((response) => {
+  var clean = String(filename || '').replace(/^\/+|\/+$/g, '');
+  var segments = clean.split('/').filter(Boolean);
+  var parent = '';
+  var folders = segments.slice(0, -1).map(function (segment) {
+    parent += '/' + segment;
+    return parent;
+  });
+  // Dropbox's upload endpoint will not create missing parents. Build the
+  // hierarchy serially; folder-exists errors are safe to ignore because the
+  // target may already have been created by another snapshot.
+  var ensure = Promise.resolve();
+  if (typeof client.filesCreateFolderV2 === 'function') {
+    folders.forEach(function (folderPath) {
+      ensure = ensure.then(function () {
+        return client.filesCreateFolderV2({ path: folderPath }).catch(function (error) {
+          var summary = error && error.error && (error.error.error_summary || error.error['.tag']) || error && error.error_summary || '';
+          // SDK versions wrap DropboxApiError differently; inspect the
+          // normalized text as a final compatibility fallback.
+          if (/conflict|already_exists|path[\\/]conflict/i.test(String(summary) + ' ' + String(error && error.message || '') + ' ' + JSON.stringify(error)) || error && error.status === 409) return null;
+          throw error;
+        });
+      });
+    });
+  }
+  var operation = ensure.then(function () {
+    return client.filesUpload({ contents: fileContent, path: "/" + clean, mode: 'overwrite' });
+  });
+  var timeoutId;
+  var timeout = new Promise(function (_, reject) { timeoutId = setTimeout(function () { reject(new Error('Dropbox upload timed out.')); }, 30000); });
+  Promise.race([operation, timeout]).then(function () {
+    clearTimeout(timeoutId);
+    console.log('[fastack] Dropbox upload complete:', '/' + clean);
     return callback(null, "Successfully wrote " + filename);
-  }).catch((error) => {
+  }).catch(function (error) {
+    clearTimeout(timeoutId);
+    console.error('[fastack] Dropbox upload failed:', filename, error && (error.error || error.message || error));
     return callback(error, null);
   });
 };

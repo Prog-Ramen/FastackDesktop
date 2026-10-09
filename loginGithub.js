@@ -5,6 +5,7 @@ const remote = require('@electron/remote');
 const path = require('path');
 const $ = require('jquery');
 const electron = require('electron');
+const { ipcRenderer } = electron;
 const base64 = require('base-64');
 const pkceChallenge = require("pkce-challenge").default;
 var githubFunctions = require('./helper/github_functions');
@@ -16,12 +17,15 @@ var ls = require('local-storage');
 var cryptoHelper = require('./helper/crypto_helper');
 var prestack = require('./helper/prestack_functions');
 var randomBytes = require('randombytes');
+var profileCache = require('./helper/profile_cache');
+var taskMerge = require('./helper/task_merge');
 var authorization_url = "";
 var TOKEN_URL = "https://server.samar.pw:3000/github/authenticate?code=";
+var oauthState = null;
 
 var window = remote.getCurrentWindow();
 // Clear only auth-related keys so user preferences (settings, key bindings) persist across logout.
-['token', 'username', 'repoName', 'platform', 'stack', 'key', 'reponame', 'repoNameInput', 'createPage', 'currIndex']
+['token', 'username', 'repoName', 'platform', 'key', 'reponame', 'repoNameInput', 'createPage', 'currIndex']
   .forEach(function (k) { ls.remove(k); });
 ls("GITHUB_CLIENT_ID", '442dbe2e6a65ceb60986');
 ls("DROPBOX_CLIENT_ID", 'sd6zmtq7kdohuqh');
@@ -54,6 +58,7 @@ $(document).ready(function () {
 
   function goLocal() {
     ls('platform', 'Local');
+    ls('activeWorkspace', 'Local|local|local');
     ls('token', '');
     ls('username', 'local');
     localFunctions.makeRepo('', 'local', function (err) {
@@ -62,8 +67,16 @@ $(document).ready(function () {
       ls('key', null);
       prestack.lookForStackLocal(function (err, stackValue) {
         if (err) console.log(err);
-        ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-        routeAfterLogin();
+        var merged = taskMerge.mergeStacks(stackValue);
+        localFunctions.readAllSnapshots('local').forEach(function (snapshot) {
+          try { merged = taskMerge.mergeStacks(merged, JSON.parse(snapshot.content)); } catch (e) {}
+        });
+        var cached = profileCache.list();
+        Object.keys(cached).forEach(function (key) {
+          if (cached[key] && cached[key].stack) merged = taskMerge.mergeStacks(merged, cached[key].stack);
+        });
+        ls('stack', merged);
+        writeLocalMirror(merged, routeAfterLogin);
       });
     });
   }
@@ -102,36 +115,123 @@ $(document).ready(function () {
   $('#login').on('submit', function (evt) {
     evt.preventDefault();
     var buttonType = $("button[type=submit][clicked=true], input[type=submit][clicked=true]").val();
+    // Keep each provider/repository's last known stack locally. The login
+    // screen must never erase another workspace's cached tasks.
+    var previousStack = ls('stack');
+    if (previousStack && ls('platform')) profileCache.save(ls('platform'), ls('username'), ls('repoName'), previousStack);
     ls('platform', buttonType);
     [authorization_url, TOKEN_URL] = get_auth_urls(buttonType)
-    fetch(authorization_url, {
-      method: 'GET',
-      redirect: 'follow'
-    })
-      .then((response) => {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          response.json().then((json) => {
-            if (json.hasOwnProperty('token')) {
-              console.log(json.token);
-              setTokenAndChangePage(json.token);
-            }
-          });
-        } else {
-          if (buttonType === "Dropbox") {
-            dropbox_auth();
-
-          } else {
-            var authWindow = new BrowserWindow({ width: 800, height: 800, show: false, 'node-integration': false });
-            authWindow.loadURL(authorization_url);
-            remote.getCurrentWindow().hide();
-
-            authWindow.show();
-            runOAuthWindowFunctions(authWindow);
-          }
-        }
+    if (buttonType === "Github") {
+      github_device_auth();
+    } else if (buttonType === "Dropbox") {
+      dropbox_auth();
+    } else {
+      var authWindow = new BrowserWindow({
+        width: 800, height: 800, show: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, partition: 'persist:fastack-oauth' }
       });
+      runOAuthWindowFunctions(authWindow);
+      authWindow.loadURL(authorization_url);
+      remote.getCurrentWindow().hide();
+      authWindow.show();
+    }
   });
+
+  function github_device_auth() {
+    var stopped = false;
+    var pollTimer = null;
+    ipcRenderer.invoke('github-device:start', ls('GITHUB_CLIENT_ID')).then(function (result) {
+      if (!result || !result.ok) {
+        var detail = result && (result.description || result.error) || 'Unknown error';
+        if (result && result.error === 'device_flow_disabled') detail = 'Device Flow is disabled for the Fastack OAuth App. Enable it in GitHub OAuth App settings, then retry.';
+        $('#errorpassword').text(detail);
+        return;
+      }
+      $('#login').html(
+        '<div class="device-auth">' +
+        '<p>Enter this code in GitHub:</p>' +
+        '<button type="button" id="githubDeviceCode" class="device-code" title="Copy code">' + result.userCode + '</button>' +
+        '<p id="githubDeviceStatus">Waiting for authorization…</p>' +
+        '<button type="button" id="githubDeviceOpen">Open GitHub</button>' +
+        '<button type="button" id="githubDeviceCancel">Cancel</button>' +
+        '</div>'
+      );
+      function openVerification() { shell.openExternal(result.verificationUri); }
+      $('#githubDeviceOpen').on('click', openVerification);
+      $('#githubDeviceCode').on('click', function () { electron.clipboard.writeText(result.userCode); $('#githubDeviceStatus').text('Code copied. Paste it into GitHub.'); });
+      $('#githubDeviceCancel').on('click', function () { stopped = true; if (pollTimer) clearTimeout(pollTimer); window.location.reload(); });
+      openVerification();
+      var intervalMs = Math.max(5, result.interval) * 1000;
+      function poll() {
+        if (stopped) return;
+        ipcRenderer.invoke('github-device:poll', { clientId: ls('GITHUB_CLIENT_ID'), deviceCode: result.deviceCode }).then(function (status) {
+          if (status && status.ok && status.token) {
+            stopped = true;
+            $('#githubDeviceStatus').text('Authorized. Loading your tasks…');
+            setTokenAndChangePage(status.token);
+            return;
+          }
+          if (status && status.slowDown) intervalMs += 5000;
+          if (status && status.error && !status.pending && !status.slowDown) {
+            stopped = true;
+            $('#githubDeviceStatus').text(status.description || status.error);
+            return;
+          }
+          pollTimer = setTimeout(poll, intervalMs);
+        }).catch(function (error) {
+          stopped = true;
+          $('#githubDeviceStatus').text('Authorization check failed: ' + (error.message || error));
+        });
+      }
+      pollTimer = setTimeout(poll, intervalMs);
+    });
+  }
+
+  function writeLocalMirror(stack, callback) {
+    var now = new Date();
+    var datePath = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+    localFunctions.createUpdateFile('', 'local/' + datePath, JSON.stringify(stack || { incomplete: [], complete: [] }), callback || function () {});
+  }
+
+  function backfillDropboxHistory(repoName, cloudStack, done) {
+    var snapshots = localFunctions.readAllSnapshots('local');
+    if (!snapshots.length) return done(cloudStack);
+    var today = new Date();
+    var todayPath = today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate();
+    var merged = taskMerge.mergeStacks(cloudStack);
+    var localAll = null;
+    snapshots.forEach(function (snapshot) {
+      try {
+        var parsed = JSON.parse(snapshot.content);
+        localAll = taskMerge.mergeStacks(localAll, parsed);
+        if (snapshot.datePath !== todayPath) dropboxFunctions.createUpdateFile(ls('token'), repoName + '/' + snapshot.datePath, snapshot.content, function () {});
+      } catch (e) {}
+    });
+    if (localAll) merged = taskMerge.mergeStacks(merged, localAll);
+    var payload = JSON.stringify(merged);
+    dropboxFunctions.createUpdateFile(ls('token'), repoName + '/' + todayPath, payload, function (err) {
+      if (err) console.error('[fastack] Dropbox history backfill failed:', err.message || err);
+      done(merged);
+    });
+  }
+
+  function backfillCloudHistory(provider, repoName, username, cloudStack, done) {
+    var snapshots = localFunctions.readAllSnapshots('local');
+    if (!snapshots.length) return done(cloudStack);
+    var now = new Date(), todayPath = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+    var merged = taskMerge.mergeStacks(cloudStack);
+    var localAll = null;
+    snapshots.forEach(function (s) {
+      try { var parsed = JSON.parse(s.content); localAll = taskMerge.mergeStacks(localAll, parsed); if (s.datePath !== todayPath) write(s.datePath, s.content); } catch (e) {}
+    });
+    if (localAll) merged = taskMerge.mergeStacks(merged, localAll);
+    write(todayPath, JSON.stringify(merged), function () { done(merged); });
+    function write(path, content, cb) {
+      var finish = cb || function () {};
+      if (provider === 'Github') return githubFunctions.createUpdateFile(ls('token'), username, repoName, path, content, finish);
+      return gdriveFunctions.createUpdateFile(ls('token'), repoName + '/' + path, content, finish);
+    }
+  }
 
   function dropbox_auth() {
     var showIntervalId = setInterval(function () {
@@ -167,12 +267,20 @@ $(document).ready(function () {
               } else {
                 if (result) {
                   ls('repoName', result);
-                  prestack.lookForStackDropBox(function (err, stackValue) {
+                  var loadDropboxStack = function (finish) {
+                    var now = new Date(), todayPath = '/' + result + '/' + now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+                    dropboxFunctions.getContent(ls('token'), todayPath, function (directErr, directText) {
+                      if (!directErr && directText) { try { return finish(null, JSON.parse(directText)); } catch (e) {} }
+                      prestack.lookForStackDropBox(finish);
+                    });
+                  };
+                  loadDropboxStack(function (err, stackValue) {
                     if (err) {
                       $('#errorreponame').text("Cannot get the current stack from the repository: " + err.message);
                     }
-                    ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-                    routeAfterLogin();
+                    ls('activeWorkspace', 'Dropbox|fastack|' + result);
+                    ls('stack', stackValue ? stackValue : (profileCache.load('Dropbox', 'fastack', result) || { 'complete': [], 'incomplete': [] }));
+                    backfillDropboxHistory(result, ls('stack'), function (merged) { ls('stack', merged); profileCache.save('Dropbox', 'fastack', result, merged); writeLocalMirror(merged, routeAfterLogin); });
                   });
                 } else {
                   window.location.replace("./stack/stack_name_db.html");
@@ -189,18 +297,19 @@ $(document).ready(function () {
   }
 
   function get_auth_urls(buttonType) {
+    oauthState = randomBytes(24).toString('hex');
     if (buttonType === "Github") {
       authorization_url = 'https://github.com/login/oauth/authorize?';
-      authorization_url = authorization_url + 'client_id=' + ls('GITHUB_CLIENT_ID') + "&scope=repo";
+      authorization_url = authorization_url + 'client_id=' + ls('GITHUB_CLIENT_ID') + "&scope=repo&state=" + encodeURIComponent(oauthState);
     } else if (buttonType === "Dropbox") {
       authorization_url = "https://www.dropbox.com/oauth2/authorize?";
       TOKEN_URL = "https://server.samar.pw:3000/dropbox/authenticate?code=";
-      authorization_url = authorization_url + 'client_id=' + ls('DROPBOX_CLIENT_ID') + "&response_type=code";
+      authorization_url = authorization_url + 'client_id=' + ls('DROPBOX_CLIENT_ID') + "&response_type=code&state=" + encodeURIComponent(oauthState);
     } else if (buttonType === "Google") {
       var pkce = pkceChallenge(128);
       authorization_url = 'https://accounts.google.com/o/oauth2/auth?code_challenge=' + pkce.code_challenge + '&code_challenge_method=S256&redirect_uri=http://127.0.0.1:5000&scope=https://www.googleapis.com/auth/drive&';
       TOKEN_URL = "https://server.samar.pw:3000/google/authenticate?code_verifier=" + pkce.code_verifier + "&code=";
-      authorization_url = authorization_url + 'client_id=' + ls('GOOGLE_CLIENT_ID') + "&response_type=code"
+      authorization_url = authorization_url + 'client_id=' + ls('GOOGLE_CLIENT_ID') + "&response_type=code&state=" + encodeURIComponent(oauthState)
     }
     return [authorization_url, TOKEN_URL]
   }
@@ -255,8 +364,9 @@ $(document).ready(function () {
             if (err) {
               $('#errorreponame').text("Cannot get the current stack from the folder: " + (err.message || err));
             }
-            ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-            routeAfterLogin();
+            ls('activeWorkspace', 'Google|google|' + ls('repoName'));
+            ls('stack', stackValue ? stackValue : (profileCache.load('Google', 'google', ls('repoName')) || { 'complete': [], 'incomplete': [] }));
+            backfillCloudHistory('Google', ls('repoName'), null, ls('stack'), function (merged) { ls('stack', merged); profileCache.save('Google', 'google', ls('repoName'), merged); writeLocalMirror(merged, routeAfterLogin); });
           });
         } else {
           ls("reponame", "");
@@ -276,12 +386,13 @@ $(document).ready(function () {
           if (result[0]) {
             ls('repoName', result[0]);
             ls('key', null);
-            prestack.lookForStack(function (err, stackValue) {
+          prestack.lookForStack(function (err, stackValue) {
               if (err) {
                 $('#errorreponame').text("Cannot get the current stack from the repository: " + err.message);
               }
-              ls('stack', stackValue ? stackValue : { 'complete': [], 'incomplete': [] });
-              routeAfterLogin();
+              ls('activeWorkspace', 'Github|' + username + '|' + result[0]);
+              ls('stack', stackValue ? stackValue : (profileCache.load('Github', username, result[0]) || { 'complete': [], 'incomplete': [] }));
+              backfillCloudHistory('Github', ls('repoName'), username, ls('stack'), function (merged) { ls('stack', merged); profileCache.save('Github', username, ls('repoName'), merged); writeLocalMirror(merged, routeAfterLogin); });
             });
           } else {
             console.log("SWITCHING");
@@ -295,63 +406,71 @@ $(document).ready(function () {
 
 
 
-  function handleCallback(url, window) {
-    console.log(url);
-    var raw_code = /code=([^&]*)/.exec(url) || null;
-    var code = (raw_code && raw_code.length > 1) ? raw_code[1] : null;
-    var error = /\?error=(.+)$/.exec(url);
-    console.log(code);
+  function handleCallback(url, window, onAuthenticated) {
+    var parsed;
+    try { parsed = new URL(url); } catch (e) { return false; }
+    // 2FA and passkey pages can contain an encoded return URL with `code=`.
+    // Only accept a top-level callback code after navigation has left GitHub.
+    if (parsed.hostname === 'github.com' || parsed.hostname.endsWith('.github.com')) return false;
+    var code = parsed.searchParams.get('code');
+    var error = parsed.searchParams.get('error');
+    var returnedState = parsed.searchParams.get('state');
+    if ((code || error) && oauthState && returnedState !== oauthState) {
+      $('#errorpassword').text('Authentication was rejected because its security state did not match. Please try again.');
+      remote.getCurrentWindow().show();
+      return true;
+    }
 
     // If there is a code, proceed to get token from github
     if (code) {
       getToken(code, function (result) {
-        loggedIn = true;
-        window.hide();
-        setTokenAndChangePage(result)
+        if (!result) return;
+        onAuthenticated();
+        window.close();
+        setTokenAndChangePage(result);
       });
-      return;
+      return true;
     } else if (error) {
       alert('Oops! Something went wrong and we couldn\'t' +
         'log you in using Github. Please try again.');
-      return;
+      return true;
     }
+    return false;
   }
 
   function getToken(code, callback) {
-    console.log(code);
-    $.getJSON(TOKEN_URL + code, function (data) {
-      console.log(data);
+    $.getJSON(TOKEN_URL + encodeURIComponent(code), function (data) {
       if (data.token) {
         return callback(data.token);
       } else {
-        console.log("Second click initialized");
-        $('#github').click();
+        $('#errorpassword').text('GitHub authorized the app, but token exchange failed. Please try again.');
+        remote.getCurrentWindow().show();
+        return callback(null);
       }
+    }).fail(function () {
+      $('#errorpassword').text('Could not complete GitHub authentication. Check your connection and try again.');
+      remote.getCurrentWindow().show();
+      callback(null);
     });
   }
 
   // Handle the response from GitHub
   function runOAuthWindowFunctions(window) {
     var loggedIn = false;
-
-    window.webContents.on('did-redirect-navigation', function (event, oldUrl, newUrl) {
-      //console.log(newUrl);
-      //handleCallback(newUrl);
+    var callbackStarted = false;
+    function inspect(url) {
+      if (callbackStarted) return;
+      callbackStarted = handleCallback(url, window, function () { loggedIn = true; }) || false;
+    }
+    // Keep GitHub's passkey/2FA auxiliary pages in this controlled auth window.
+    window.webContents.setWindowOpenHandler(function (details) {
+      window.loadURL(details.url);
+      return { action: 'deny' };
     });
-
-    window.webContents.on('did-finish-load', function (event, url) {
-      //window.hide();
-      url = event.sender.getURL();
-      if (url.includes("google")) {
-        //var authWindow = new BrowserWindow({width: 800, height: 800, show: false, 'node-integration': false});
-        handleCallback(url, window);
-        //authWindow.show();
-      } else {
-        handleCallback(url, window);
-      }
-
-
-    });
+    window.webContents.on('will-navigate', function (_event, url) { inspect(url); });
+    window.webContents.on('did-redirect-navigation', function (_event, url) { inspect(url); });
+    window.webContents.on('did-navigate', function (_event, url) { inspect(url); });
+    window.webContents.on('did-finish-load', function (event) { inspect(event.sender.getURL()); });
 
     // Reset the authWindow on close
     window.on('close', function () {

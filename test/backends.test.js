@@ -33,6 +33,7 @@ test('Dropbox supports current SDK result envelopes for listing and overwrites s
   const calls = [];
   class FakeDropbox {
     filesListFolder(args) { calls.push(['list', args]); return Promise.resolve({ result: { entries: [{ name: '2026' }] } }); }
+    filesCreateFolderV2(args) { calls.push(['folder', args]); return Promise.resolve({ result: { metadata: { path_display: args.path } } }); }
     filesUpload(args) { calls.push(['upload', args]); return Promise.resolve({ result: { name: '31' } }); }
     filesDownload(args) { calls.push(['download', args]); return Promise.resolve({ result: { fileBinary: Buffer.from('{"incomplete":[]}') } }); }
   }
@@ -41,15 +42,36 @@ test('Dropbox supports current SDK result envelopes for listing and overwrites s
   try {
     const dropbox = require('../helper/dropbox_functions');
     const entries = await callbackResult(cb => dropbox.listFiles('token', 'Fastack-tasks', cb));
+    await callbackResult(cb => dropbox.listFiles('token', '/Fastack-tasks', cb));
     await callbackResult(cb => dropbox.createUpdateFile('token', 'Fastack-tasks/2026/8/31', '{}', cb));
     const content = await callbackResult(cb => dropbox.getContent('token', '/Fastack-tasks/2026/8/31', cb));
     assert.deepEqual(entries, [{ name: '2026' }]);
-    assert.deepEqual(calls[1][1], { contents: '{}', path: '/Fastack-tasks/2026/8/31', mode: 'overwrite' });
+    assert.deepEqual(calls.find(c => c[0] === 'list' && c[1].path === '/Fastack-tasks')[1], { path: '/Fastack-tasks' });
+    assert.deepEqual(calls.find(c => c[0] === 'upload')[1], { contents: '{}', path: '/Fastack-tasks/2026/8/31', mode: 'overwrite' });
     assert.equal(content, '{"incomplete":[]}');
   } finally {
     sdkModule.exports = originalExports;
     delete require.cache[helperPath];
   }
+});
+
+test('Dropbox continues uploading when parent folders already exist', async () => {
+  const sdkPath = require.resolve('dropbox');
+  const helperPath = require.resolve('../helper/dropbox_functions');
+  const sdkModule = require.cache[sdkPath] || (require(sdkPath), require.cache[sdkPath]);
+  const originalExports = sdkModule.exports;
+  let uploaded = false;
+  class ExistingFolderDropbox {
+    filesCreateFolderV2() { return Promise.reject({ error: { error_summary: 'path/conflict/folder' } }); }
+    filesUpload() { uploaded = true; return Promise.resolve({ result: {} }); }
+  }
+  sdkModule.exports = { Dropbox: ExistingFolderDropbox };
+  delete require.cache[helperPath];
+  try {
+    const dropbox = require('../helper/dropbox_functions');
+    await callbackResult(cb => dropbox.createUpdateFile('token', 'Fastack-tasks/2026/8/31', '{}', cb));
+    assert.equal(uploaded, true);
+  } finally { sdkModule.exports = originalExports; delete require.cache[helperPath]; }
 });
 
 test('Google Drive updates an existing snapshot with multipart JSON', async () => {

@@ -15,6 +15,7 @@
 var ls = require('local-storage');
 var localFunctions = require('../helper/local_functions');
 var intelligence = require('../helper/intelligence');
+require('electron').ipcRenderer.on('window-layout-changed', function (_event, layout) { if (layout && layout.preset) ls('windowSizePreset', layout.preset); });
 
 var SAMPLE_MS = 5000;              // Must match activity_tracker.SAMPLE_MS
 var CATEGORY_COLORS = {
@@ -244,7 +245,6 @@ function renderIntelligence(rows) {
 }
 
 $(document).ready(function () {
-  $('#backButton').on('click', function () { window.location.replace('./stack.html'); });
   $('.tab').on('click', function () {
     $('.tab').removeClass('active');
     $(this).addClass('active');

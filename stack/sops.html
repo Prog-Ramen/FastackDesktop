@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fastack — SOP Library</title>
+  <link rel="stylesheet" href="./stack.css">
+  <link rel="stylesheet" href="./sops.css">
+  <link rel="stylesheet" href="./theme.css">
+</head>
+<body class="draggable">
+  <div class="sop-shell">
+    <header class="page-header">
+      <div class="page-heading"><h1>SOPs</h1></div>
+      <button id="newSop" class="page-header-action sop-primary">New</button>
+    </header>
+    <main class="sop-body">
+      <input id="sopSearch" class="sop-search" type="search" placeholder="Search SOPs by name, folder, or purpose…" aria-label="Search SOPs">
+      <div id="sopList" class="sop-list"></div>
+      <section id="sopEditor" class="sop-panel" style="display:none">
+        <button id="prefillTask" class="sop-secondary" type="button" style="margin-bottom:10px">Use current task</button>
+        <label>Title<input id="sopTitle" placeholder="e.g. Publish desktop release"></label>
+        <label>Hierarchy<input id="sopPath" placeholder="Engineering / Releases"></label>
+        <label>Purpose<textarea id="sopPurpose" placeholder="What outcome does this procedure guarantee?"></textarea></label>
+        <label>Human steps <small>one instruction per line</small><textarea id="sopSteps" placeholder="Validate the release build&#10;Review the generated artifacts"></textarea></label>
+        <label>Required SOPs <small>select one or more with Cmd/Ctrl-click</small><input id="childSopSearch" class="sop-search sop-search-inline" type="search" placeholder="Filter required SOPs…" aria-label="Filter required SOPs"><select id="childSop" multiple size="4"></select></label>
+        <label class="approval-row"><input id="approvalGate" type="checkbox"> Require approval before completion</label>
+        <div id="sopError" class="sop-error"></div>
+        <div class="sop-actions"><button id="cancelSop" class="sop-secondary">Cancel</button><button id="saveSop" class="sop-primary">Save SOP</button></div>
+      </section>
+      <section id="sopDetail" class="sop-panel" style="display:none"></section>
+    </main>
+  </div>
+  <script src="./sops.js"></script>
+  <script src="./settings.js"></script>
+<script src="../helper/shortcut_compass.js"></script>
+<script src="./top_nav.js"></script>
+</body>
+</html>

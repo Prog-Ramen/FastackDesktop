@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, Tray, nativeImage, globalShortcut, dialog } = require('electron')
 const path = require('path')
+const https = require('https')
 require('@electron/remote/main').initialize()
 
 // --- Shortcut registration lives in main so callbacks don't close over a
@@ -32,6 +33,55 @@ function safeSendShortcut(win, key) {
   } catch (e) { /* renderer gone */ }
 }
 
+function githubPostForm(pathname, fields) {
+  return new Promise((resolve, reject) => {
+    const body = new URLSearchParams(fields).toString();
+    const request = https.request({
+      hostname: 'github.com', port: 443, path: pathname, method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'FastackDesktop/1.0'
+      },
+      timeout: 30000
+    }, response => {
+      let text = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { text += chunk; });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(text || '{}');
+          if (response.statusCode >= 400 && !parsed.error) parsed.error = 'HTTP ' + response.statusCode;
+          resolve(parsed);
+        } catch (error) { reject(new Error('GitHub returned an invalid response.')); }
+      });
+    });
+    request.on('timeout', () => request.destroy(new Error('GitHub authentication timed out.')));
+    request.on('error', reject);
+    request.end(body);
+  });
+}
+
+// Register authentication IPC before any window can load. These handlers use
+// fetch only when invoked, after the network polyfill below has initialized.
+ipcMain.handle('github-device:start', async (_event, clientId) => {
+  try {
+    const body = await githubPostForm('/login/device/code', { client_id: clientId, scope: 'repo' });
+    if (body.error) return { ok: false, error: body.error, description: body.error_description };
+    return { ok: true, deviceCode: body.device_code, userCode: body.user_code, verificationUri: body.verification_uri, expiresIn: body.expires_in, interval: body.interval || 5 };
+  } catch (error) { return { ok: false, error: error.message || String(error) }; }
+});
+
+ipcMain.handle('github-device:poll', async (_event, params) => {
+  try {
+    const body = await githubPostForm('/login/oauth/access_token', { client_id: params.clientId, device_code: params.deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' });
+    if (body.access_token) return { ok: true, token: body.access_token };
+    return { ok: false, pending: body.error === 'authorization_pending', slowDown: body.error === 'slow_down', error: body.error, description: body.error_description };
+  } catch (error) { return { ok: false, error: error.message || String(error) }; }
+});
+console.log('[fastack] GitHub device authentication ready');
+
 app.on('will-quit', () => {
   try { globalShortcut.unregisterAll(); } catch (e) { /* noop */ }
 });
@@ -40,6 +90,37 @@ const assetsDir = path.join(__dirname, 'assets')
 
 let tray = undefined
 let window = undefined
+const windowPresets = {
+  compact:  { width: 300, height: 420 },
+  standard: { width: 340, height: 560 },
+  large:    { width: 400, height: 680 }
+};
+let currentWindowPreset = 'standard';
+
+function resetWindowPosition() {
+  if (!window || !tray || window.isDestroyed()) return;
+  const trayPos = tray.getBounds();
+  const bounds = window.getBounds();
+  const display = require('electron').screen.getDisplayNearestPoint({ x: Math.round(trayPos.x), y: Math.round(trayPos.y) });
+  const work = display.workArea;
+  let x = Math.round(trayPos.x + trayPos.width / 2 - bounds.width / 2);
+  let y = process.platform === 'darwin' ? Math.round(trayPos.y + trayPos.height) : Math.round(trayPos.y - bounds.height);
+  x = Math.max(work.x, Math.min(x, work.x + work.width - bounds.width));
+  y = Math.max(work.y, Math.min(y, work.y + work.height - bounds.height));
+  window.setPosition(x, y, false);
+}
+
+function applyWindowPreset(name) {
+  if (!windowPresets[name]) name = 'standard';
+  currentWindowPreset = name;
+  if (window && !window.isDestroyed()) {
+    window.setSize(windowPresets[name].width, windowPresets[name].height, true);
+    // Keep the popup anchored to its original tray location when a page or
+    // settings screen reapplies the size preset.
+    resetWindowPosition();
+  }
+  return { preset: name, width: windowPresets[name].width, height: windowPresets[name].height };
+}
 function start_context() {
   // This method is called once Electron is ready to run our code
   // It is effectively the main method of our Electron app
@@ -77,11 +158,14 @@ app.on('ready', () => {
 
   // Make the popup window for the menubar
   window = new BrowserWindow({
-    width: 300,
-    height: 500,
+    width: windowPresets.standard.width,
+    height: windowPresets.standard.height,
     show: false,
     frame: false,
-    resizable: true,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
     transparent: true,
     hasShadow: false,
     webPreferences: {
@@ -102,6 +186,7 @@ app.on('ready', () => {
   // FASTACK_LOCAL=1 skips the OAuth screen and drops straight into Local mode.
   const homeQuery = process.env.FASTACK_LOCAL === '1' ? '?local=1' : '';
   window.loadURL(`file://${path.join(__dirname, './home.html')}${homeQuery}`);
+  applyWindowPreset('standard');
 
   // Only close the popup on blur if dev tools isn't opened.
   // Delay + re-check so a transient blur (macOS accessibility prompt, or the
@@ -126,6 +211,11 @@ app.on('ready', () => {
   window.webContents.on('did-finish-load', () => console.log('[fastack] load done'));
   window.webContents.on('did-fail-load', (_e, code, desc, url) => console.log('[fastack] load FAILED %s %s (%s)', code, desc, url));
   window.webContents.on('render-process-gone', (_e, details) => console.log('[fastack] RENDERER GONE:', details));
+  window.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+    if (message && (message.indexOf('[fastack]') !== -1 || message.indexOf('Dropbox') !== -1)) {
+      console.log('[renderer]', message, '(' + sourceId + ':' + line + ')');
+    }
+  });
   window.webContents.on('unresponsive', () => console.log('[fastack] renderer unresponsive'));
   window.webContents.on('responsive', () => console.log('[fastack] renderer responsive again'));
 });
@@ -162,6 +252,16 @@ const showWindowbef = () => {
   window.show();
   window.focus()
 };
+
+ipcMain.handle('window:set-size', (_event, preset) => applyWindowPreset(preset));
+ipcMain.handle('window:cycle-size', () => {
+  const order = ['compact', 'standard', 'large'];
+  const next = order[(order.indexOf(currentWindowPreset) + 1) % order.length];
+  const result = applyWindowPreset(next);
+  return result;
+});
+ipcMain.handle('window:reset-position', () => { return applyWindowPreset(currentWindowPreset); });
+ipcMain.handle('window:get-layout', () => ({ preset: currentWindowPreset, bounds: window && !window.isDestroyed() ? window.getBounds() : null }));
 
 
 ipcMain.on('show-window', () => {
@@ -329,40 +429,56 @@ ipcMain.handle('rag:generate', async (evt, params) => {
 // Needs Accessibility permission on macOS Sonoma+. Falls back to idle-only.
 var keyboardAddon = null;
 var keyboardEnabled = false;
+var keyboardWorker = null;
+var keyboardWorkerReady = false;
+var keyboardRequestId = 0;
+var keyboardRequests = new Map();
 
 function initKeyboardAddon() {
-  if (keyboardEnabled) return;
-  try {
-    keyboardAddon = require('./build/Release/keyboard_addon.node');
-    if (!keyboardAddon) throw new Error('addon not found at build/Release');
-  } catch (e) {
-    // Try native build directory
-    try {
-      keyboardAddon = require('./native/build/Release/keyboard_addon.node');
-    } catch (e2) {
-      console.log('[fastack] keyboard addon unavailable:', e2.message);
-      keyboardAddon = null;
+  if (keyboardWorker) return;
+  var fork = require('child_process').fork;
+  keyboardWorkerReady = false;
+  keyboardWorker = fork(path.join(__dirname, 'helper', 'keyboard_worker.js'), [], {
+    env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1' }),
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc']
+  });
+  keyboardWorker.on('message', function (message) {
+    if (message.type === 'ready') {
+      keyboardWorkerReady = !!message.started;
+      keyboardEnabled = keyboardWorkerReady;
+      console.log('[fastack] keyboard worker', keyboardEnabled ? 'started' : 'unavailable');
+    } else if (message.type === 'counts') {
+      var resolve = keyboardRequests.get(message.requestId);
+      if (resolve) { keyboardRequests.delete(message.requestId); resolve(message.counts); }
     }
-  }
-  if (keyboardAddon) {
-    var ok = keyboardAddon.start();
-    keyboardEnabled = ok;
-    console.log('[fastack] keyboard addon', ok ? 'started' : 'failed to start (may need Accessibility permission)');
-  }
+  });
+  keyboardWorker.on('exit', function (code, signal) {
+    console.log('[fastack] keyboard worker exited:', signal || code);
+    keyboardWorker = null; keyboardWorkerReady = false; keyboardEnabled = false;
+    keyboardRequests.forEach(function (resolve) { resolve({ keyDown: 0, keyUp: 0 }); });
+    keyboardRequests.clear();
+  });
 }
 
 function stopKeyboardAddon() {
-  if (keyboardAddon && keyboardAddon.stop) {
-    keyboardAddon.stop();
-    keyboardEnabled = false;
-    console.log('[fastack] keyboard addon stopped');
-  }
+  if (keyboardWorker) keyboardWorker.kill();
+  keyboardWorker = null; keyboardWorkerReady = false; keyboardEnabled = false;
 }
 
 ipcMain.handle('keyboard:get-counts', () => {
-  if (!keyboardEnabled || !keyboardAddon || !keyboardAddon.getCounts) return { keyDown: 0, keyUp: 0 };
-  try { return keyboardAddon.getCounts(); } catch (e) { return { keyDown: 0, keyUp: 0 }; }
+  if (!keyboardWorkerReady || !keyboardWorker) return { keyDown: 0, keyUp: 0 };
+  return new Promise(function (resolve) {
+    var requestId = ++keyboardRequestId;
+    keyboardRequests.set(requestId, resolve);
+    try { keyboardWorker.send({ type: 'counts', requestId: requestId }); }
+    catch (e) { keyboardRequests.delete(requestId); resolve({ keyDown: 0, keyUp: 0 }); }
+    setTimeout(function () {
+      if (keyboardRequests.delete(requestId)) resolve({ keyDown: 0, keyUp: 0 });
+    }, 1000);
+  });
 });
+
+ipcMain.handle('keyboard:status', () => ({ enabled: keyboardEnabled, worker: !!keyboardWorker }));
 
 ipcMain.on('keyboard:init', () => {
   if (!keyboardEnabled) initKeyboardAddon();
@@ -378,12 +494,23 @@ ipcMain.on('register-shortcuts', (_evt, list) => {
   (list || []).forEach((entry) => {
     if (!entry || !entry.accel) return;
     try {
-      globalShortcut.register(entry.accel, () => {
+      const registered = globalShortcut.register(entry.accel, () => {
         recentShortcutMs = Date.now();
-        safeSendShortcut(window, entry.key);
+        if (entry.key === 'WindowSize') {
+          const layout = applyWindowPreset(['compact', 'standard', 'large'][( ['compact', 'standard', 'large'].indexOf(currentWindowPreset) + 1) % 3]);
+          resetWindowPosition();
+          try { window.webContents.send('window-layout-changed', layout); } catch (e) {}
+          safeSendShortcut(window, entry.key);
+        } else if (entry.key === 'ResetWindowPosition') {
+          resetWindowPosition();
+          safeSendShortcut(window, entry.key);
+        } else {
+          safeSendShortcut(window, entry.key);
+        }
       });
-      registeredAccels.add(entry.accel);
-    } catch (e) { /* invalid accelerator */ }
+      if (registered) registeredAccels.add(entry.accel);
+      else console.error('[fastack] shortcut registration failed:', entry.key, entry.accel);
+    } catch (e) { console.error('[fastack] invalid shortcut:', entry.key, entry.accel, e.message || e); }
   });
 });
 app.disableHardwareAcceleration();

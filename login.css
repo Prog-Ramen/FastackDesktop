@@ -301,6 +301,7 @@ span {
 .brand-lockup p { margin: 8px 0 0; color: #8b96a8; font-size: 11px; }
 #login { display: flex; flex-direction: column; gap: 8px; }
 #login #github, #login #dropbox, #login #google { display: grid; grid-template-columns: 26px 1fr 16px; align-items: center; width: 100%; min-height: 44px; height: auto; margin: 0; padding: 8px 11px; -webkit-app-region: no-drag; }
+#login #github > span, #login #dropbox > span, #login #google > span { padding: 0; }
 .provider-mark { display: grid; place-items: center; width: 24px; height: 24px; margin: 0; padding: 0; border-radius: 7px; color: #dce6f2; background: rgba(255,255,255,.07); font-size: 9px; font-weight: 700; }
 .provider-arrow { margin: 0; padding: 0; color: #657286; font-size: 20px; }
 .login-divider { display: flex; align-items: center; gap: 9px; margin: 14px 0 10px; color: #657286; font-size: 10px; }
@@ -308,3 +309,6 @@ span {
 .login-divider span { margin: 0; padding: 0; font-size: 10px; }
 .login-shell .secondaryLink { margin-top: 0; text-align: center; }
 .privacy-note { margin: 16px 0 0; color: #657286; text-align: center; font-size: 9px; line-height: 1.4; }
+.device-auth { text-align:center; color:#aeb8c7; font-size:11px; }
+#login .device-auth button { width:100%; min-height:38px; margin:5px 0; padding:8px; border:1px solid rgba(255,255,255,.09); border-radius:9px; color:#f5f7fa; background:#1a2029; cursor:pointer; }
+#login .device-auth .device-code { min-height:52px; color:#9ed0fa; border-color:rgba(91,156,214,.4); font-size:22px; font-weight:700; letter-spacing:.14em; }

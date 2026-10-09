@@ -11,9 +11,9 @@
 <div class="task-create-shell">
     <header class="task-create-header">
         <button type="button" id="headerBack" class="icon-button" aria-label="Back to tasks">&#8592;</button>
-        <div>
+        <div class="task-create-heading">
             <p id="createTaskTitle">New Task</p>
-            <p class="task-create-subtitle">Capture the task now. Add detail only when it helps.</p>
+            <p class="task-create-subtitle">Capture it now; add detail later.</p>
         </div>
         <span class="create-status" id="createStatus">Draft</span>
     </header>
@@ -53,6 +53,11 @@
                         <div id="similarTasks"></div>
                         <button type="button" id="applyEstimate" class="coach-action" style="display:none;">Use estimate</button>
                         <button type="button" id="decomposeTask" class="coach-action">Break into steps</button>
+                    </div>
+                    <div id="sopQuickPicker" class="rag-panel sop-task-picker">
+                        <div class="rag-header">Start from an SOP</div>
+                        <input id="taskSopSearch" type="search" placeholder="Search SOPs to use for this task…" aria-label="Search SOPs for task">
+                        <div id="taskSopResults" class="rag-empty">Search your SOP library to prefill this task.</div>
                     </div>
                     </section>
                     <details class="form-card optional-card">
@@ -143,7 +148,7 @@
                 </div>
                 <span id="error" class="error form-error"></span>
                 <div class="sticky-actions">
-                    <input type="submit" id="goBack" class="btn-ghost" value="Cancel">
+                    <input type="button" id="goBack" class="btn-ghost" value="Cancel">
                     <input type="submit" id="submitTask" value="Create Task">
                 </div>
             </form>
@@ -152,6 +157,7 @@
 </div>
 <script charset="utf-8" type="text/javascript" src="./createTask.js"></script>
 <script charset="utf-8" type="text/javascript" src="./settings.js"></script>
+<script src="../helper/shortcut_compass.js"></script>
 <script>
   var __tour = require('../helper/tutorial');
   __tour.init();

@@ -25,7 +25,8 @@ $(document).ready(function () {
     $('#backendPill').text(ls('platform') || 'Local');
     // Keep ordering fresh without a zero-delay loop that monopolizes the renderer.
     setInterval(function(){ stackFunctions.stackSort(); }, 30000);
-    ls('currIndex', 0);
+    if (ls('currIndex') == null) ls('currIndex', 0);
+    $('#workspaceButton').on('click', function () { navigateTo('./taskLists.html'); });
     // Recurring-task sweep: on load and every 60s. Spawns any templates whose
     // nextRunAt has passed. Safe to call repeatedly — noop if nothing due.
     try {
@@ -50,7 +51,12 @@ $(document).ready(function () {
         $('.s1').html('<div class="stack-empty"><strong>No tasks yet</strong><p>Create a task to start your focus stack.</p><button id="emptyAdd" type="button">Create task</button></div>');
     }
     $(document).on('click', '#emptyAdd', function () { $('#addButton').trigger('click'); });
-    $('.fastack-toolbar').on('keydown', '[role=button]', function (evt) {
+    $(document).on('dblclick', '.task', function () {
+        var index = parseInt((this.id.match(/\d+/) || ['0'])[0], 10);
+        ls('currIndex', index);
+        navigateTo('./taskDetail.html');
+    });
+    $('.global-topbar').on('keydown', 'button', function (evt) {
         if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); $(this).trigger('click'); }
     });
     $(".taskName").mouseover(function(){
@@ -66,7 +72,9 @@ $(document).ready(function () {
         $c.remove();
     });
     $('#logout').click(function(){
-        navigateTo('../home.html');
+        var leave = function () { electron.ipcRenderer.invoke('window:set-size', 'standard').finally(function () { navigateTo('../home.html'); }); };
+        if (stackFunctions.isClockedIn()) return stackFunctions.clockOut(leave);
+        leave();
     });
     $('#addButton').click(function(){
         ls('createPage', 'add');
@@ -79,11 +87,8 @@ $(document).ready(function () {
         // Preserve countdown state across re-render: save the interval ID and
         // whether we were clocked in.  stackFunctions.clockOut() destroys the
         // DOM element the timer updates — re-query it AFTER re-render.
-        var wasClockedIn = $('#timeButton').attr('src') !== "../images/clock.png";
-        var savedTimer = ls('countdownTimer') || { id: 0 };
-        var oldId = savedTimer.id;
+        var wasClockedIn = stackFunctions.isClockedIn();
         stackFunctions.clockOut();
-        clearInterval(oldId);
         var $stack = $('.s1');
         $stack.addClass('is-switching');
         $stack.find('.task').removeClass('is-selected');
@@ -93,21 +98,25 @@ $(document).ready(function () {
             requestAnimationFrame(function () { $stack.removeClass('is-switching'); });
             // Restart through the full clock-in path so both the countdown and
             // activity analytics follow the newly selected task.
-            if (wasClockedIn) stackFunctions.clockIn(0);
+            if (wasClockedIn) stackFunctions.clockIn(numb);
         }, 90);
         // If we were clocked in, the task was moved to index 0 by
         // generateFullStackHTML.  Restore the timer so the countdown continues.
         if (wasClockedIn) {
-            $('#timeButton').attr("src","../images/clocko.png");
+            $('#timeButton').addClass('is-running');
         }
     });
     $('#timeButton').click(function(){
-        if ($('#timeButton').attr('src') == "../images/clock.png"){
-            $('#timeButton').attr("src","../images/clocko.png");
-            stackFunctions.clockIn(0);
+        if (!stackFunctions.isClockedIn()){
+            $('#timeButton').addClass('is-running');
+            var currentStack = ls('stack') || {}, selectedTask = (currentStack.incomplete || [])[parseInt(ls('currIndex'), 10) || 0];
+            if (selectedTask && selectedTask.lock && selectedTask.lock.owner !== ls('fastackDeviceId')) {
+                if (confirm('This task has a timer running on another platform. Transfer the timer to this device?')) { delete selectedTask.lock; delete selectedTask.timerHandoff; ls('stack', currentStack); stackFunctions.clockIn(ls('currIndex') || 0); }
+            } else if (!stackFunctions.clockIn(ls('currIndex') || 0)) alert('This task is currently locked by another device.');
         } else {
-            $('#timeButton').attr("src","../images/clock.png");
+            $('#timeButton').removeClass('is-running');
             stackFunctions.clockOut();
+            $('#transferTimer').hide();
         }
     });
     $('#settingsButton').click(function(){
@@ -115,6 +124,9 @@ $(document).ready(function () {
     });
     $('#reportButton').click(function(){
         navigateTo('./report.html');
+    });
+    $('#sopButton').click(function(){
+        navigateTo('./sops.html');
     });
     $(".taskName").mouseleave(function(){
         $(this).find('.header').css("text-overflow", "ellipsis");
@@ -126,29 +138,39 @@ $(document).ready(function () {
     // Keyboard counts come from the native addon (main process) via IPC.
     // Scroll (wheel) counts come from renderer-level event listeners.
     var scrollCount = 0;
+    var keyboardCount = 0;
     var activitySampleTimer = null;
 
     $(document).on('wheel', function () { scrollCount++; });
+    $(document).on('keydown', function () {
+        if (ls('keyboardTrackingEnabled')) keyboardCount++;
+    });
 
     function startActivityTracking() {
         scrollCount = 0;
-        // Initialize the native addon if the user has enabled keyboard tracking.
+        keyboardCount = 0;
         if (ls('keyboardTrackingEnabled')) {
             try { ipcRenderer.send('keyboard:init'); } catch (e) {}
         }
         activitySampleTimer = setInterval(function () {
-            try {
+            if (ls('keyboardTrackingEnabled')) {
                 ipcRenderer.invoke('keyboard:get-counts').then(function (counts) {
-                    var kb = (counts && counts.keyDown) || 0;
-                    stackFunctions.recordActivity(kb, scrollCount);
-                    scrollCount = 0;
-                }).catch(function () { /* addon not available */ });
-            } catch (e) {}
+                    stackFunctions.recordActivity(((counts && counts.keyDown) || 0) + keyboardCount, scrollCount);
+                    keyboardCount = 0; scrollCount = 0;
+                }).catch(function () {
+                    stackFunctions.recordActivity(keyboardCount, scrollCount);
+                    keyboardCount = 0; scrollCount = 0;
+                });
+            } else {
+                stackFunctions.recordActivity(0, scrollCount);
+                keyboardCount = 0; scrollCount = 0;
+            }
         }, 5000);
     }
 
     function stopActivityTracking() {
         if (activitySampleTimer) { clearInterval(activitySampleTimer); activitySampleTimer = null; }
+        keyboardCount = 0;
         scrollCount = 0;
         try { ipcRenderer.send('keyboard:stop'); } catch (e) {}
     }
@@ -157,13 +179,15 @@ $(document).ready(function () {
     var origClockIn = stackFunctions.clockIn;
     var origClockOut = stackFunctions.clockOut;
     stackFunctions.clockIn = function (index) {
-        origClockIn(index);
-        startActivityTracking();
+        var started = origClockIn.call(stackFunctions, index);
+        if (started) startActivityTracking();
+        return started;
     };
-    stackFunctions.clockOut = function () {
+    stackFunctions.clockOut = function (callback) {
         stopActivityTracking();
-        origClockOut();
+        return origClockOut.call(stackFunctions, callback);
     };
+    if (stackFunctions.restoreClock()) startActivityTracking();
 
     $(".task").each(function(){
         var taskTop = $(this).offset().top;

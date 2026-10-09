@@ -21,6 +21,10 @@ var { ipcRenderer } = remote;
 var cryptoHelper = require('../helper/crypto_helper');
 var stackFunctions = require('../helper/stack_functions');
 var intelligence = require('../helper/intelligence');
+var rolloverManager = require('../helper/rollover_manager');
+var profileCache = require('../helper/profile_cache');
+var sopRepository = require('../helper/sop_repository');
+var sopEngine = require('../helper/sop_engine');
 // RAG lives in main to keep the popup renderer's heap tiny — see setting.js.
 var ragIpc = require('electron').ipcRenderer;
 
@@ -76,6 +80,42 @@ app.whenReady().then(() => {
     },
     plugins: [[chart, chartOptions], [codeSyntaxHighlight, { highlighter: Prism }], colorSyntax, tableMergedCell, uml]
   });
+  var sourceSopId = null;
+  var sopDraft = ls('taskDraftFromSop');
+  if (sopDraft && ls('createPage') === 'add') {
+    sourceSopId = sopDraft.sopId || null;
+    $('#tname').val(sopDraft.title || '').trigger('input');
+    $('#description').val(sopDraft.description || '');
+    $('#tags').val(sopDraft.tags || '#sop');
+    if (sopDraft.notes) editor.setMarkdown(sopDraft.notes);
+    $('#createStatus').addClass('is-ready').text('From SOP');
+    ls.remove('taskDraftFromSop');
+  }
+  function renderTaskSops() {
+    var query = String($('#taskSopSearch').val() || '').trim().toLowerCase();
+    if (!query) { $('#taskSopResults').text('Search your SOP library to prefill this task.'); return; }
+    var matches = sopRepository.list().filter(function (s) {
+      return [s.title, s.purpose, (s.categoryPath || []).join(' / ')].join(' ').toLowerCase().indexOf(query) !== -1;
+    }).slice(0, 6);
+    $('#taskSopResults').html(matches.length ? matches.map(function (s) {
+      return '<button type="button" class="sop-task-result" data-sop-id="'+String(s.id).replace(/[^a-zA-Z0-9_-]/g,'')+'"><strong>'+String(s.title).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];})+'</strong><small>'+String((s.categoryPath || []).join(' / ') || 'Unfiled')+'</small></button>';
+    }).join('') : 'No matching SOPs.');
+  }
+  function applyTaskSop(id) {
+    var sop = sopRepository.get(id); if (!sop) return;
+    sourceSopId = sop.id;
+    $('#tname').val(sop.title).trigger('input');
+    $('#description').val(sop.purpose || '');
+    $('#tags').val('#sop');
+    try {
+      var plan = sopEngine.plan(sop.id, sopRepository.get);
+      editor.setMarkdown('## Procedure\n\nSOP: **' + sop.title + '** (v' + sop.version + ')\n\n' + plan.steps.map(function (step) { return '- [ ] ' + (step.title || step.instruction || ('Run ' + step.adapter)); }).join('\n'));
+      $('.notes-card').prop('open', true);
+    } catch (e) { $('#taskSopResults').text('SOP could not be loaded: ' + e.message); return; }
+    $('#taskSopSearch').val(''); $('#taskSopResults').text('SOP selected: ' + sop.title);
+  }
+  $('#taskSopSearch').on('input', renderTaskSops);
+  $('#taskSopResults').on('click', '.sop-task-result', function () { applyTaskSop($(this).data('sop-id')); });
   var suggestedEstimate = null;
   var coachTimer = null;
   function refreshTaskCoach() {
@@ -570,6 +610,7 @@ app.whenReady().then(() => {
           if (ls('createPage') == "add") {
             var timeTaken = 0;
             var newTask = stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete);
+            if (sourceSopId) newTask.sourceSopId = sourceSopId;
             if (isRecurring) {
               // Save as recurring template *and* spawn the first instance now.
               var recurrence = readRecurrenceFromUI();
@@ -581,25 +622,57 @@ app.whenReady().then(() => {
             }
           } else {
             var timeTaken = parseInt(stack[ls('currIndex')].timeTaken, 10) || 0;
-            stack[ls('currIndex')] = stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete);
+            var existingTask = stack[ls('currIndex')];
+            var editedTask = stackFunctions.createTask(taskName, startDate, creationDate, completionDate, ignoreDates, timeHours.toString(), timeMins.toString(), priority.toString(), description, tags, notes, timeTaken, complete);
+            editedTask.taskId = existingTask.taskId || editedTask.taskId;
+            editedTask.descriptionConflicts = existingTask.descriptionConflicts || [];
+            editedTask.hasConflicts = existingTask.hasConflicts || false;
+            stack[ls('currIndex')] = editedTask;
           }
 
           ls('stack', { 'incomplete': stack, 'complete': ls('stack')['complete'], 'templates': ls('stack')['templates'] || [] });
+          profileCache.saveActive(ls('stack'));
           stackFunctions.stackSort();
           var datePath = d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate();
           var stackJson = JSON.stringify(ls('stack'));
-          var onWrite = function (err) { if (err) { console.log(err); } };
-          if (ls('platform') === "Github") {
-            githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), datePath, stackJson, onWrite);
-          } else if (ls('platform') === "Dropbox") {
-            dropboxFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
-          } else if (ls('platform') === "Google") {
-            gdriveFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
-          } else if (ls('platform') === "Local") {
-            localFunctions.createUpdateFile("", ls('repoName') + "/" + datePath, stackJson, onWrite);
-          }
+          var saveFinished = false;
+          var onWrite = function (err) {
+            if (saveFinished) return;
+            saveFinished = true;
+            if (err) {
+              console.error('[fastack] task save failed:', err);
+              $('#submitTask').prop('disabled', false).val(ls('createPage') === 'edit' ? 'Save changes' : 'Create task');
+              $('#error').text('Task is saved locally, but cloud sync failed: ' + (err.message || err));
+              return;
+            }
+            navigateTo("./stack.html");
+          };
           $('#submitTask').prop('disabled', true).val(ls('createPage') === 'edit' ? 'Saving…' : 'Creating…');
-          navigateTo("./stack.html");
+          console.log('[fastack] task save backend:', ls('platform'), 'repo:', ls('repoName'));
+          var selectedBackend = String(ls('platform') || '').toLowerCase();
+          // Keep a local mirror for every provider. It is the merge source when
+          // switching accounts/providers and also protects against offline writes.
+          localFunctions.createUpdateFile('', 'local/' + datePath, stackJson, function (localErr) {
+            if (localErr) return onWrite(localErr);
+            if (selectedBackend === "github") {
+            rolloverManager.checkGithub(ls('token'), ls('username'), ls('repoName'), function (_checkErr, health) {
+              if (health && health.warning) {
+                $('#error').text(health.warning);
+                if (!health.ok) {
+                  $('#submitTask').prop('disabled', false).val(ls('createPage') === 'edit' ? 'Save changes' : 'Create task');
+                  return;
+                }
+              }
+              githubFunctions.createUpdateFile(ls('token'), ls('username'), ls('repoName'), datePath, stackJson, onWrite);
+            });
+            } else if (selectedBackend === "dropbox") {
+            dropboxFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
+            } else if (selectedBackend === "google") {
+            gdriveFunctions.createUpdateFile(ls('token'), ls('repoName') + "/" + datePath, stackJson, onWrite);
+            } else if (selectedBackend === "local") {
+            localFunctions.createUpdateFile("", ls('repoName') + "/" + datePath, stackJson, onWrite);
+            } else onWrite(new Error('No storage backend is selected.'));
+          });
         }
       }
     });

@@ -7,6 +7,20 @@ var stackFns = require('../helper/stack_functions');
 // + a 25MB model would OOM-crash the 300x500 popup. We drive it via IPC.
 
 $(document).ready(function () {
+    var selectedSize = ls('windowSizePreset') || 'standard';
+    function showSelectedSize(size) {
+        $('.size-option').removeClass('selected').attr('aria-checked', 'false');
+        $('.size-option[data-size="' + size + '"]').addClass('selected').attr('aria-checked', 'true');
+    }
+    showSelectedSize(selectedSize);
+    settingIpc.invoke('window:set-size', selectedSize);
+    $('.size-option').on('click', function () {
+        selectedSize = $(this).data('size');
+        ls('windowSizePreset', selectedSize);
+        showSelectedSize(selectedSize);
+        settingIpc.invoke('window:set-size', selectedSize);
+    });
+    $('#resetWindowPosition').on('click', function () { settingIpc.invoke('window:reset-position'); });
     $('#showTour').on('click', function () {
         // start() navigates to the tour's starting page on its own.
         tutorial.start();
@@ -84,21 +98,17 @@ $(document).ready(function () {
     });
 
     // ---------- Keyboard activity tracking (optional) ----------
-    // Native addon captures global keyboard events. Needs Accessibility
-    // permission on macOS Sonoma+. Default is off.
+    // Isolated global keyboard counts with a safe in-app fallback. Default off.
     var kbTrackingEnabled = !!ls('keyboardTrackingEnabled');
     $('#keyboardTrackingEnabled').prop('checked', kbTrackingEnabled);
-    $('#activityStatus').text(kbTrackingEnabled ? 'Enabled (native addon).' : 'Disabled.');
+    $('#activityStatus').text(kbTrackingEnabled ? 'Enabled; native worker starts when you clock in.' : 'Disabled.');
     $('#keyboardTrackingEnabled').on('change', function () {
         var on = $(this).prop('checked');
         ls('keyboardTrackingEnabled', on);
         kbTrackingEnabled = on;
         if (on) {
-            // Tell main to start the addon.
-            try { settingIpc.send('keyboard:init'); } catch (e) {}
-            $('#activityStatus').text('Enabled (native addon).');
+            $('#activityStatus').text('Enabled; native worker starts when you clock in.');
         } else {
-            try { settingIpc.send('keyboard:stop'); } catch (e) {}
             $('#activityStatus').text('Disabled.');
         }
     });
@@ -200,13 +210,23 @@ $(document).ready(function () {
         window.location.replace('./stack.html');
     })
     getCreateSettings(function(err, result){
+        var shortcutLabels = {
+            NewTask: 'New item (contextual)',
+            ScrollTaskUp: 'Previous item',
+            ScrollTaskDown: 'Next item',
+            OpenTask: 'Open item',
+            EditTask: 'Edit item',
+            PopTask: 'Complete / delete item',
+            ClockIn: 'Clock in (tasks only)',
+            ClockOut: 'Clock out (tasks only)'
+        };
         $.each(ls('settings'), function(i, val){
 
             $(".tab").append(
                 `<div class="taskInput">
-                        <label for="tname">`+ i.match(/[A-Z][a-z]+/g).map(x => x).join(' ').trim() +`</label><br><br>
+                        <label for="` + i + `">`+ (shortcutLabels[i] || i.match(/[A-Z][a-z]+/g).map(x => x).join(' ').trim()) +`</label>
                         <input readonly id="` + i +`" type="text" name="openClose" value="`+val+`">
-                    </div><br></br>`
+                    </div>`
             );
             $('#' + i).focusin(function(){
                 $('#' + i).val('Listening');

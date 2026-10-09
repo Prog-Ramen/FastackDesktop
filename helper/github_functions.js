@@ -104,6 +104,17 @@ exports.getUsername = function(token, callback){
   })
 };
 
+exports.getRepoInfo = function (token, username, repoName, callback) {
+  fetch('https://api.github.com/repos/' + encodeURIComponent(username) + '/' + encodeURIComponent(repoName), {
+    method: 'GET', headers: { 'Authorization': ghAuth(token), 'Accept': 'application/vnd.github+json' }
+  }).then(function (response) {
+    return response.json().then(function (json) {
+      if (response.status >= 400) return callback(json.message || 'Could not check GitHub repository size.', null);
+      callback(null, json);
+    });
+  }).catch(function (error) { callback(error, null); });
+};
+
 
 exports.getContent = function(token, username, filepath, repoName, callback){
   fetch("https://api.github.com/repos/" + username + "/" + repoName + "/contents/" + filepath, {
@@ -216,7 +227,7 @@ exports.createUpdateFile = function(token, username, repoName, filename, fileCon
             return callback(json.message, null);
           }
         });
-      });
+      }).catch((error) => callback(error, null));
     })
     
   }

@@ -6,19 +6,19 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" type="text/css" href="./stack.css">
   <link rel="stylesheet" type="text/css" href="./report.css">
+  <link rel="stylesheet" type="text/css" href="./theme.css">
   <script>if (window.module) module = window.module;</script>
 </head>
 <body class="draggable">
   <div class="container">
-    <div class="fastack-toolbar">
-      <img id="backButton" class="tb-icon" src="../images/back_button.png" alt="Back" height="18" width="18">
-      <span class="report-title">Productivity</span>
-      <div class="tabs tb-right">
+    <header class="page-header">
+      <div class="page-heading"><h1>Productivity</h1></div>
+      <div class="tabs page-header-actions">
         <span class="tab active" data-range="today">Today</span>
         <span class="tab" data-range="week">Week</span>
         <span class="tab" data-range="all">All</span>
       </div>
-    </div>
+    </header>
 
     <div class="report-body">
       <div id="emptyState" class="empty" style="display:none">
@@ -81,5 +81,8 @@
   </div>
 
 <script charset="utf-8" type="text/javascript" src="./report.js"></script>
+<script charset="utf-8" type="text/javascript" src="./settings.js"></script>
+<script src="../helper/shortcut_compass.js"></script>
+<script src="./top_nav.js"></script>
 </body>
 </html>
