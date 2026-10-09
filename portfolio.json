@@ -2,14 +2,10 @@
   "schemaVersion": 1,
   "title": "Fastack",
   "summary": "A keyboard-first menubar task manager with prioritized stacks, focus timers, productivity insights, SOPs, and local or cloud-backed storage.",
-  "source": {
-    "branch": "claude-update",
-    "commit": "0dbc833"
-  },
   "preview": {
     "type": "iframe",
-    "url": "/previews/fastack/?v=claude-update-0dbc833-2",
-    "revision": "claude-update-0dbc833-2",
+    "url": "/previews/fastack/?v=fastack-ui-v2",
+    "revision": "fastack-ui-v2",
     "image": "images/va@2x.png"
   },
   "download": "https://github.com/Prog-Ramen/FastackDesktop/releases/download/browser-preview-v1.0.0/fastack-browser-preview.zip"
