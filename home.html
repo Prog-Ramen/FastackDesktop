@@ -4,16 +4,22 @@
     <link rel="stylesheet" type="text/css" href="login.css">
 </head>
 <body class="draggable">
-<div>
-    <div align="left" id="errorpassword"></div><br>
-    <center><img class="titleIcon" style=" max-width:100%;max-height:100%;" src="./images/fastack_logo_test.png" alt="FaStack Logo"></center><br>
-    <center><img id="logoHome" src="./images/fastack_wo_stack.svg" alt="FaStack Logo" width="128" height="128"></center>
+<main class="login-shell">
+    <div id="errorpassword" role="alert"></div>
+    <div class="brand-lockup">
+      <img id="logoHome" src="./images/fastack_wo_stack.svg" alt="" width="76" height="76">
+      <img class="titleIcon" src="./images/fastack_logo_white.png" alt="Fastack">
+      <p>Focus on one task. Keep everything in sync.</p>
+    </div>
     <form id="login">
-        <center><input type="submit" id="github" value="Github"></center>
-        <center><input type="submit" id="dropbox" value="Dropbox"></center>
-        <center><input type="submit" id="google" value="Google"></center>
+        <button type="submit" id="github" value="Github"><span class="provider-mark">GH</span><span>Continue with GitHub</span><span class="provider-arrow">›</span></button>
+        <button type="submit" id="dropbox" value="Dropbox"><span class="provider-mark">DB</span><span>Continue with Dropbox</span><span class="provider-arrow">›</span></button>
+        <button type="submit" id="google" value="Google"><span class="provider-mark">G</span><span>Continue with Google</span><span class="provider-arrow">›</span></button>
     </form>
-</div>
+    <div class="login-divider"><span>or</span></div>
+    <a href="#" id="local" class="secondaryLink">Use Fastack locally</a>
+    <p class="privacy-note">Your task content stays in the storage provider you choose.</p>
+</main>
 <script charset="utf-8" type="text/javascript" src="loginGithub.js"></script>
 </body>
 </html>

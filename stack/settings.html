@@ -1,47 +1,129 @@
 <html xmlns="http://www.w3.org/1999/html">
 <head>
-    <script src="../node_modules/jquery/dist/jquery.js"></script>
     <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
-    <script src='../node_modules/markdown-it/dist/markdown-it.js'></script>
-    <script src="../node_modules/to-mark/dist/to-mark.js"></script>
-    <script src="../node_modules/tui-code-snippet/dist/tui-code-snippet.js"></script>
-    <script src="../node_modules/codemirror/lib/codemirror.js"></script>
-    <script src="../node_modules/squire-rte/build/squire-raw.js"></script>
-    <link rel="stylesheet" href="../node_modules/codemirror/lib/codemirror.css">
-    <script src="../node_modules/tui-editor/dist/tui-editor-Editor.js"></script>
-    <script src="../node_modules/tui-chart/dist/tui-chart.js"></script>
-    <script src="../node_modules/tui-editor/dist/tui-editor-extTable.js"></script>
-    <script src="../node_modules/tui-editor/dist/tui-editor-extChart.js"></script>
-    <script src="../node_modules/plantuml-encoder/dist/plantuml-encoder.js"></script>
-    <script src="../node_modules/tui-editor/dist/tui-editor-extUML.js"></script>
-    <link rel="stylesheet" href="../node_modules/tui-editor/dist/tui-editor.css">
-    <link rel="stylesheet" href="../node_modules/tui-chart/dist/tui-chart.css">
-    <link rel="stylesheet" href="../node_modules/tui-editor/dist/tui-editor-contents.css">
     <title>FaStack</title>
     <link rel="stylesheet" type="text/css" href="stackInfo.css">
+    <link rel="stylesheet" type="text/css" href="./tutorial.css">
 </head>
 <body class="draggable">
 
-<div>
-    <div class="rows">
-        <div class="column">
-            <br>
-            <p id="createTaskTitle">Settings</p>
-            <form id="updateSettings">
-                <div class="tab">
-                </div> 
-                <span id="error" class="error"><br><br></span>
-                <br>
-                <br>
-                <center><input type="submit" id="update" value="Update Settings"></center>
-                <center><input type="submit" id="goBack" value="Go Back"></center>
-            </form>
+<div class="settings-shell">
+    <header class="settings-header">
+        <h1 id="createTaskTitle">Settings</h1>
+    </header>
+
+    <form id="updateSettings" class="settings-form">
+
+        <section class="card" id="windowLayoutSection">
+            <div class="card-header"><h2 class="card-title">Window layout</h2></div>
+            <p class="card-subtitle">The window remains movable but uses a fixed size. Cycle sizes or snap it back beneath the tray icon at any time.</p>
+            <div class="size-options" role="radiogroup" aria-label="Window size">
+                <button type="button" class="size-option" data-size="compact">Compact<span>300 × 420</span></button>
+                <button type="button" class="size-option" data-size="standard">Standard<span>340 × 560</span></button>
+                <button type="button" class="size-option" data-size="large">Large<span>400 × 680</span></button>
+            </div>
+            <div class="card-actions"><input type="button" id="resetWindowPosition" class="btn-secondary" value="Reset position"></div>
+        </section>
+
+        <!-- Keyboard shortcuts (populated by setting.js) -->
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Keyboard shortcuts</h2>
+            </div>
+            <p class="card-subtitle">Click a field, then press keys to record.</p>
+            <div class="tab shortcuts-grid"></div>
+        </section>
+
+        <!-- Keyboard activity tracking -->
+        <section class="card" id="activitySection">
+            <div class="card-header">
+                <h2 class="card-title">Keyboard activity tracking</h2>
+                <label class="switch" title="Count key presses inside Fastack to distinguish writing from reading in the productivity report">
+                    <input type="checkbox" id="keyboardTrackingEnabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="card-subtitle">
+                While clocked in, Fastack samples system idle time and scrolling. Optionally, an isolated native worker counts keystrokes system-wide, with in-app counting as a safe fallback.
+                The productivity report then distinguishes <strong>writing</strong> (typing) from <strong>reading</strong> (scrolling).
+                Requires <strong>Accessibility permission</strong> on macOS. A worker failure cannot crash Fastack.
+                Default is off — key values, window titles, app names, screenshots, and typed content are never captured.
+            </p>
+            <span id="activityStatus" class="card-subtitle" style="color:#8b96a8">Disabled.</span>
+        </section>
+
+        <!-- Onboarding -->
+        <section class="card" id="tourSection">
+            <div class="card-header">
+                <h2 class="card-title">Onboarding</h2>
+            </div>
+            <p class="card-subtitle">Take a quick tour of the interface.</p>
+            <div class="card-actions">
+                <input type="button" id="showTour" class="btn-secondary" value="Show tour">
+            </div>
+        </section>
+
+        <!-- Cloud sync -->
+        <section class="card" id="syncSection" style="display:none">
+            <div class="card-header">
+                <h2 class="card-title">Push local stack to cloud</h2>
+            </div>
+            <p class="card-subtitle">Move your existing local stack to a cloud backend.</p>
+            <input id="syncRepoName" type="text" placeholder="Cloud repo / folder name" class="card-input">
+            <div class="card-actions">
+                <input type="button" id="syncGithub"  class="btn-secondary" value="GitHub">
+                <input type="button" id="syncDropbox" class="btn-secondary" value="Dropbox">
+                <input type="button" id="syncGoogle"  class="btn-secondary" value="Google Drive">
+            </div>
+            <span id="syncStatus" class="card-status warn"></span>
+        </section>
+
+        <!-- Docs RAG -->
+        <section class="card" id="ragSection">
+            <div class="card-header">
+                <h2 class="card-title">Docs RAG</h2>
+                <label class="switch" title="Use indexed docs as context when generating notes">
+                    <input type="checkbox" id="ragEnabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="card-subtitle">
+                Index a folder of docs / code so the AI can pull related snippets when generating notes.
+                Off by default — enable if you have a dedicated docs folder. Generative AI is local and its first use downloads approximately 1.9 GB.
+            </p>
+            <p id="ragCurrent" class="card-subtitle" style="color:#8b96a8">No folder indexed yet.</p>
+            <div class="card-actions" id="ragControls">
+                <input type="button" id="ragPick"    class="btn-secondary" value="Choose folder…">
+                <input type="button" id="ragReindex" class="btn-secondary" value="Reindex" style="display:none;">
+                <input type="button" id="ragClear"   class="btn-ghost"     value="Clear index" style="display:none;">
+            </div>
+            <span id="ragStatus" class="card-status info"></span>
+        </section>
+
+        <!-- Recurring tasks -->
+        <section class="card" id="recurringMgmtSection">
+            <div class="card-header">
+                <h2 class="card-title">Recurring tasks</h2>
+            </div>
+            <div id="recurringList" class="recurring-list"></div>
+        </section>
+
+        <span id="error" class="error"></span>
+
+        <div class="settings-actions">
+            <input type="submit" id="update" value="Save settings">
+            <input type="submit" id="goBack" class="btn-ghost" value="Go back">
         </div>
-    </div>
+    </form>
 </div>
+
 <script charset="utf-8" type="text/javascript" src="./createTask.js"></script>
 <script charset="utf-8" type="text/javascript" src="./settings.js"></script>
 <script charset="utf-8" type="text/javascript" src="./setting.js"></script>
-
+<script src="../helper/shortcut_compass.js"></script>
+<script>
+  var __tour = require('../helper/tutorial');
+  __tour.init();
+</script>
 </body>
 </html>

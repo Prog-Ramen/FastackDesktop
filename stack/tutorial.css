@@ -1,0 +1,180 @@
+/* Fastack interactive tour — highlights real UI elements + bottom-anchored coach card. */
+
+.tour-highlight {
+  position: relative;
+  z-index: 99998;
+  border-radius: 8px !important;
+  outline: 2px solid #5b9cd6 !important;
+  outline-offset: 3px;
+  animation: tourPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tourPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(91, 156, 214, 0.15),
+                0 0 22px rgba(91, 156, 214, 0.30);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(91, 156, 214, 0.22),
+                0 0 32px rgba(91, 156, 214, 0.50);
+  }
+}
+
+.tour-card {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(26, 32, 41, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px 10px;
+  color: #f5f7fa;
+  z-index: 99999;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  animation: tourSlideUp 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+}
+.tour-card.tour-card-top {
+  bottom: auto;
+  top: 8px;
+  animation-name: tourSlideDown;
+}
+
+@keyframes tourSlideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes tourSlideDown {
+  from { transform: translateY(-40px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.tour-progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  overflow: hidden;
+}
+.tour-progress-bar {
+  height: 100%;
+  background: #5b9cd6;
+  transition: width 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.tour-counter {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8b96a8;
+  margin: 6px 0 4px;
+}
+
+.tour-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tour-shortcut {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(91, 156, 214, 0.15);
+  border: 1px solid rgba(91, 156, 214, 0.35);
+  border-radius: 5px;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #7dbcf0;
+}
+
+.tour-body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b9c3d3;
+  margin: 4px 0 10px;
+}
+
+.tour-hint {
+  font-size: 11.5px;
+  color: #7dbcf0;
+  padding: 6px 10px;
+  background: rgba(91, 156, 214, 0.10);
+  border-left: 2px solid #5b9cd6;
+  border-radius: 4px;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tour-hint::before {
+  content: "↳";
+  color: #5b9cd6;
+  font-weight: 600;
+}
+
+/* Mandatory steps get a subtle border tint so the "no Next button" state feels intentional. */
+.tour-card.tour-card-must-act {
+  border-color: rgba(91, 156, 214, 0.35);
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.tour-spacer { flex: 0 0 1px; }
+
+.tour-btn {
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease, color 120ms ease;
+  font-family: inherit;
+  -webkit-app-region: no-drag;
+}
+.tour-btn.tour-next {
+  background: #5b9cd6;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(91, 156, 214, 0.28);
+}
+.tour-btn.tour-next:hover {
+  background: #6bacea;
+  transform: translateY(-1px);
+}
+.tour-btn.tour-back {
+  background: transparent;
+  color: #8b96a8;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.tour-btn.tour-back:hover {
+  color: #f5f7fa;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.tour-btn.tour-skip {
+  background: transparent;
+  color: #6b7383;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+.tour-btn.tour-skip:hover {
+  color: #d15656;
+}

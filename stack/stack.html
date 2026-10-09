@@ -4,24 +4,27 @@
   <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
   <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
   <link rel="stylesheet" type="text/css" href="./stack.css">
+  <link rel="stylesheet" type="text/css" href="./theme.css">
+  <link rel="stylesheet" type="text/css" href="./tutorial.css">
   <link rel="stylesheet" type="text/css" href="../jquery-ui.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.3/jquery.easing.compatibility.js"></script>
   <script charset="utf-8" type="text/javascript" src="../jquery-ui.min.js"></script> 
   <script>if (window.module) module = window.module;</script>
 </head>
-<body class="draggable">
+<body class="draggable task-list-page">
 <div class='container'>
-    <div style="border-radius: 5px; background-color:rgba(255, 255, 255, 0.8);"> 
-      <img id="addButton" style="padding: 1px" src="../images/add.png" alt="Add New Task" height="18px" width="18px">
-      <img id="timeButton" src="../images/clock.png" alt="Go Back" height="20px" width="20px">
-      <img id="settingsButton" src="../images/settings.png" alt="Settings " height="20px" width="20px">
-      <img id="logout" style="float:right" src="../images/logout.png" alt="Logout" height="20px" width="20px">
-    </div>
     <div class="stack s1">
     </div>
 </div>
 </body>
 
-<script charset="utf-8" type="text/javascript" src="./stack.js"></script> 
+<script charset="utf-8" type="text/javascript" src="./stack.js"></script>
 <script charset="utf-8" type="text/javascript" src="./settings.js"></script>
+<script src="../helper/shortcut_compass.js"></script>
+<script src="./top_nav.js"></script>
+<script>
+  // Tour: init() resumes an in-progress tour AND auto-starts on first run.
+  var __tour = require('../helper/tutorial');
+  __tour.init();
+</script>
 </html>

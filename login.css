@@ -1,5 +1,11 @@
+/* ---- Fastack login palette (matches stack.css) ---- */
 body {
-    background: rgba(100, 129, 162, 0.95);
+    background: rgba(15, 20, 25, 0.95);
+    color: #f5f7fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0;
 }
 
 #logo {
@@ -20,7 +26,7 @@ body {
 
 .draggable {
     -ms-overflow-style: scrollbar;
-    -webkit-app-region:drag;
+    -webkit-app-region: drag;
 }
 
 #errorDropdown {
@@ -93,8 +99,9 @@ input[type=text] {
     padding-bottom: 10px;
     padding-top: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
+
 input[type=text] {
     margin: auto;
     font-size: 16px;
@@ -105,7 +112,7 @@ input[type=text] {
     padding-bottom: 10px;
     padding-top: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 input[type=password] {
@@ -117,7 +124,7 @@ input[type=password] {
     background: transparent;
     padding-bottom: 10px;
     border-bottom: 1px solid white;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
 nobr {
@@ -131,50 +138,51 @@ nobr {
     border: 0;
     background: transparent;
     white-space: nowrap;
-    -webkit-app-region:no-drag;
+    -webkit-app-region: no-drag;
 }
 
-#encstackdata {
-    margin: auto;
-    font-size: 16px;
-    color: white;
-    outline: none;
-    border: 0;
-    background: transparent;
-    -webkit-app-region:no-drag;
-}
-
-#github, #dropbox, #google {
+#github,
+#dropbox,
+#google {
     align-self: stretch;
     display: block;
     width: 70%;
     height: 10%;
     padding-top: 4%;
-    background: black;
+    background: #1a2029;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     outline: none;
-    font-weight: bold;
-    border: 0;
+    font-weight: 500;
     margin-top: 10px;
-    color: white;
-    border-radius: 25px;
-    font-size: 15px;
-    -webkit-app-region:no-drag;
+    color: #f5f7fa;
+    border-radius: 10px;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+    -webkit-app-region: no-drag;
 }
 
-#github:hover, #dropbox:hover, #google:hover {
-    align-self: stretch;
-    display: block;
-    width: 80%;
-    height: 10%;
-    background: black;
-    outline: none;
-    padding-top: 4%;
-    font-weight: bold;
-    border: 0;
-    margin-top: 10px;
-    color: white;
-    font-size: 15px;
-    -webkit-app-region:no-drag;
+#github:hover,
+#dropbox:hover,
+#google:hover {
+    background: #232b38;
+    border-color: rgba(91, 156, 214, 0.6);
+    transform: translateY(-1px);
+    color: #ffffff;
+}
+
+.secondaryLink {
+    display: inline-block;
+    margin-top: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: "Trebuchet MS", Helvetica, sans-serif;
+    font-size: 13px;
+    text-decoration: none;
+    -webkit-app-region: no-drag;
+}
+.secondaryLink:hover {
+    color: #ffffff;
+    cursor: pointer;
 }
 
 input[type=submit] {
@@ -182,39 +190,25 @@ input[type=submit] {
     display: block;
     width: 65%;
     height: 12%;
-    padding: 20px;
-    background: #00A89D;
+    padding: 14px 20px;
+    background: #5b9cd6;
     outline: none;
-    font-weight: bold;
+    font-weight: 600;
     border: 0;
     margin-top: 5px;
-    color: white;
-    border-radius: 25px;
-    font-size: 15px;
-    -webkit-app-region:no-drag;
+    color: #ffffff;
+    border-radius: 10px;
+    font-size: 14px;
+    letter-spacing: 0.2px;
+    transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+    box-shadow: 0 2px 8px rgba(91, 156, 214, 0.25);
+    -webkit-app-region: no-drag;
 }
 
 input[type=submit]:hover {
-    align-self: stretch;
-    display: block;
-    width: 70%;
-    height: 12%;
-    padding: 20px;
-    background: #00A89D;
-    outline: none;
-    font-weight: bold;
-    border: 0;
-    margin-top: 5px;
-    color: white;
-    font-size: 15px;
-    border-radius: 25px;
-    transition: all 1s ease;
-    -webkit-transition: all 1s ease;
-    -webkit-app-region:no-drag;
-}
-
-#stackpass {
-    opacity: 0;
+    background: #6bacea;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(91, 156, 214, 0.35);
 }
 
 ::placeholder {
@@ -231,31 +225,31 @@ input[type=submit]:hover {
 
 
 .footer {
-    bottom:20px;
-    font-size: 15px;
-    color: #9fbecf;
-    text-align:center;
-    padding-top:5px;
-    font-family: "Trebuchet MS";
-    -webkit-app-region:no-drag;
+    bottom: 20px;
+    font-size: 13px;
+    color: #8b96a8;
+    text-align: center;
+    padding-top: 5px;
+    transition: color 120ms ease;
+    -webkit-app-region: no-drag;
 }
 
 .footer:hover {
-    color: white;
-    cursor:pointer;
-    -webkit-app-region:no-drag;
+    color: #f5f7fa;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
 }
 
-.center{
-    text-align:center;
+.center {
+    text-align: center;
 }
 
-#logoCat{
-    padding-bottom:30px;
+#logoCat {
+    padding-bottom: 30px;
 }
 
 .boxAround {
-    border:2px white solid;
+    border: 2px white solid;
     font-size: 24px;
     color: white;
     padding-top: 8px;
@@ -264,7 +258,7 @@ input[type=submit]:hover {
 }
 
 .headerInfo {
-    border-bottom:2px white solid;
+    border-bottom: 2px white solid;
     font-size: 19px;
     color: white;
     padding-top: 8px;
@@ -289,12 +283,32 @@ span {
     padding-bottom: 10px;
 }
 
-#repoBack{
-    margin-top:38px;
-    -webkit-app-region:no-drag;
+#repoBack {
+    margin-top: 38px;
+    -webkit-app-region: no-drag;
 }
 
 #backButton {
-    -webkit-app-region:no-drag!important;
+    -webkit-app-region: no-drag !important;
     display: block;
 }
+
+/* Release login shell */
+.login-shell { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding: 24px 26px; }
+.brand-lockup { text-align: center; margin-bottom: 22px; }
+.brand-lockup #logoHome { display: block; margin: 0 auto 10px; padding: 0; }
+.brand-lockup .titleIcon { display: block; width: 168px; max-height: 45px; object-fit: contain; margin: 0 auto; padding: 0; }
+.brand-lockup p { margin: 8px 0 0; color: #8b96a8; font-size: 11px; }
+#login { display: flex; flex-direction: column; gap: 8px; }
+#login #github, #login #dropbox, #login #google { display: grid; grid-template-columns: 26px 1fr 16px; align-items: center; width: 100%; min-height: 44px; height: auto; margin: 0; padding: 8px 11px; -webkit-app-region: no-drag; }
+#login #github > span, #login #dropbox > span, #login #google > span { padding: 0; }
+.provider-mark { display: grid; place-items: center; width: 24px; height: 24px; margin: 0; padding: 0; border-radius: 7px; color: #dce6f2; background: rgba(255,255,255,.07); font-size: 9px; font-weight: 700; }
+.provider-arrow { margin: 0; padding: 0; color: #657286; font-size: 20px; }
+.login-divider { display: flex; align-items: center; gap: 9px; margin: 14px 0 10px; color: #657286; font-size: 10px; }
+.login-divider:before, .login-divider:after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.07); }
+.login-divider span { margin: 0; padding: 0; font-size: 10px; }
+.login-shell .secondaryLink { margin-top: 0; text-align: center; }
+.privacy-note { margin: 16px 0 0; color: #657286; text-align: center; font-size: 9px; line-height: 1.4; }
+.device-auth { text-align:center; color:#aeb8c7; font-size:11px; }
+#login .device-auth button { width:100%; min-height:38px; margin:5px 0; padding:8px; border:1px solid rgba(255,255,255,.09); border-radius:9px; color:#f5f7fa; background:#1a2029; cursor:pointer; }
+#login .device-auth .device-code { min-height:52px; color:#9ed0fa; border-color:rgba(91,156,214,.4); font-size:22px; font-weight:700; letter-spacing:.14em; }

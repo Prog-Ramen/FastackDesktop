@@ -22,17 +22,21 @@ function createNewGithub(token){
 }
 
 
+function ghAuth(token) {
+  return 'Bearer ' + token;
+}
+
 exports.makeRepo = function(token, repoName, privateRepos, callback){
   fetch("https://api.github.com/user/repos", {
     method: 'POST',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
+      'Accept': 'application/vnd.github+json'
     },
     body: JSON.stringify({
       'name': repoName,
       'auto_init': true,
-      'private': privateRepos,
-      'gitignore_template': 'nanoc'
+      'private': privateRepos
     })
   })
     .then((response) => {
@@ -54,7 +58,7 @@ exports.getPlan = function(token, callback){
   fetch("https://api.github.com/user", {
     method: 'GET',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
     }
   })
     .then((response) => {
@@ -100,19 +104,28 @@ exports.getUsername = function(token, callback){
   })
 };
 
+exports.getRepoInfo = function (token, username, repoName, callback) {
+  fetch('https://api.github.com/repos/' + encodeURIComponent(username) + '/' + encodeURIComponent(repoName), {
+    method: 'GET', headers: { 'Authorization': ghAuth(token), 'Accept': 'application/vnd.github+json' }
+  }).then(function (response) {
+    return response.json().then(function (json) {
+      if (response.status >= 400) return callback(json.message || 'Could not check GitHub repository size.', null);
+      callback(null, json);
+    });
+  }).catch(function (error) { callback(error, null); });
+};
+
 
 exports.getContent = function(token, username, filepath, repoName, callback){
   fetch("https://api.github.com/repos/" + username + "/" + repoName + "/contents/" + filepath, {
     method: 'GET',
     headers: {
-      'Authorization': 'token ' + token,
+      'Authorization': ghAuth(token),
     }
   }).then((response) => {
     const isValid = response.status < 400;
     const body = response._bodyInit;
-    console.log(response.status);
     response.json().then((json) => {
-      console.log(json);
       if (isValid) {
         json['repoName'] = repoName;
         return callback(null, json);
@@ -129,7 +142,7 @@ exports.checkFastackRepoExists = function(token, username, callback){
   fetch("https://api.github.com/user/repos?affiliation=owner&per_page=100", {
     method: 'GET',
     headers: {
-      'Authorization' : 'token ' + token,
+      'Authorization' : ghAuth(token),
       'affiliation': 'owner'
     }
   })
@@ -144,28 +157,19 @@ exports.checkFastackRepoExists = function(token, username, callback){
           var temp = this;
           var found = false;
           async.map(nameArray, async.apply(this.getContent, token, username, ""), function(err, contentArray){
-            console.log(contentArray.length);
-	
             for (var repoCount = 0; repoCount < contentArray.length; repoCount++){
-	      num_files = 0;
-	      if (contentArray[repoCount]) {
-                  num_files = contentArray[repoCount].length;
-              } 
+              var num_files = 0;
+              if (contentArray[repoCount] && contentArray[repoCount].length) {
+                num_files = contentArray[repoCount].length;
+              }
               for (var fileCount = 0; fileCount < num_files; fileCount++) {
-                if (contentArray[repoCount][fileCount].name === username) {
-                  found = true;
-                  temp.getContent(token, username, username, json[repoCount].name, function(err, contentInfo){
-                    if (err){
-                      return callback('Unable to get file contents.', null);
-                    }
-                    return callback(null, [contentInfo['repoName'], contentInfo['content']]);
-                  });
-                } else if (repoCount === contentArray.length - 1 && fileCount === contentArray[repoCount].length - 1 && found === false){
-                  console.log(found);
-                  return callback(null, ["", ""]);
+                var filename_regex = new RegExp("fastack-\\d+-" + username);
+                if (filename_regex.test(contentArray[repoCount][fileCount].name)) {
+                  return callback(null, [json[repoCount].name, null]);
                 }
               }
             }
+            return callback(null, ["", ""]);
           });
         } else {
           return callback(json.message, null);
@@ -196,17 +200,20 @@ exports.createUpdateFile = function(token, username, repoName, filename, fileCon
     return callback(null, "Successfully wrote " + filename);
   } else {
     this.checkFileExists(token, username, repoName, filename, function (err, exists){
+      if (err) return callback(err, null);
       var options = {
         method: 'PUT',
         headers: {
           'Authorization': auth_header,
         },
         body: {
-          'content': btoa(fileContent),
+          'content': typeof Buffer !== 'undefined'
+            ? Buffer.from(fileContent, 'utf8').toString('base64')
+            : btoa(unescape(encodeURIComponent(fileContent))),
           'message': filename
         }
       };
-      if (exists){
+      if (exists && exists.sha) {
         options['body']['sha'] = exists.sha;
       }
       options['body'] = JSON.stringify(options['body']);
@@ -220,7 +227,7 @@ exports.createUpdateFile = function(token, username, repoName, filename, fileCon
             return callback(json.message, null);
           }
         });
-      });
+      }).catch((error) => callback(error, null));
     })
     
   }

@@ -1,0 +1,88 @@
+<html>
+<head>
+  <title>Fastack — Report</title>
+  <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+  <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="./stack.css">
+  <link rel="stylesheet" type="text/css" href="./report.css">
+  <link rel="stylesheet" type="text/css" href="./theme.css">
+  <script>if (window.module) module = window.module;</script>
+</head>
+<body class="draggable">
+  <div class="container">
+    <header class="page-header">
+      <div class="page-heading"><h1>Productivity</h1></div>
+      <div class="tabs page-header-actions">
+        <span class="tab active" data-range="today">Today</span>
+        <span class="tab" data-range="week">Week</span>
+        <span class="tab" data-range="all">All</span>
+      </div>
+    </header>
+
+    <div class="report-body">
+      <div id="emptyState" class="empty" style="display:none">
+        No activity recorded yet. Clock into a task and the tracker will
+        capture idle/active metadata locally.
+      </div>
+
+      <div id="content">
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-value" id="kpiFocus">0m</div><div class="kpi-label">Focus</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiActive">0%</div><div class="kpi-label">Active</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiCompleted">0</div><div class="kpi-label">Done</div></div>
+          <div class="kpi"><div class="kpi-value" id="kpiStreak">0d</div><div class="kpi-label">Streak</div></div>
+        </div>
+
+        <div class="insight-search">
+          <input id="taskSearch" type="search" placeholder="Find tasks by meaning…">
+          <div id="searchResults" class="insight-list" style="display:none"></div>
+        </div>
+
+        <div class="insight-grid">
+          <div class="insight-card"><div class="chart-label">Focus quality</div><div id="focusInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Interruptions</div><div id="interruptionInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Your pattern</div><div id="patternInsight" class="insight-copy"></div></div>
+          <div class="insight-card"><div class="chart-label">Estimate calibration</div><div id="estimateInsight" class="insight-copy"></div></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Recommended next</div>
+          <div id="nextTaskList" class="insight-list"></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Tasks needing attention</div>
+          <div id="staleTaskList" class="insight-list"></div>
+        </div>
+
+        <div class="chart-block" id="weeklyReviewBlock" style="display:none;">
+          <div class="chart-label">Weekly review</div>
+          <div id="weeklyReview" class="review-copy"></div>
+          <button id="copyReview" class="report-action">Copy review</button>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">Recent accomplishments</div>
+          <div id="completionSummaries" class="insight-list"></div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-label">By activity type</div>
+          <div class="chart-canvas-wrap"><canvas id="categoryChart"></canvas></div>
+        </div>
+
+        <div class="chart-block" id="sessionsBlock">
+          <div class="chart-label">Recent sessions</div>
+          <div id="sessionsList" class="sessions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script charset="utf-8" type="text/javascript" src="./report.js"></script>
+<script charset="utf-8" type="text/javascript" src="./settings.js"></script>
+<script src="../helper/shortcut_compass.js"></script>
+<script src="./top_nav.js"></script>
+</body>
+</html>

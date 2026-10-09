@@ -1,56 +1,91 @@
-# FastackDesktop
+# Fastack
 
-## Features
+A context-switching menubar task manager. Tasks live in a stack, sorted by overdue → no-date → today → upcoming with priority (1–100) as the tiebreaker. Pop the top task when you finish it. Clock in / clock out per task. Rich markdown notes (tables, charts, UML) via Toast UI Editor.
 
-Context switching task manager, that organizes tasks based on priority and time. Tasks are added to a stack and items are completed from the top of the stack downwards. Once a task is complete it is popped off the stack. Users can clock in and clock out and the time taken on each task can be recorded. There is also a notes editor that allows users to enter information in markdown format and provides users with the capability to create tables, charts, and uml diagrams. Currently the github functionality is implemented but the utility functions for dropbox and google drive are upcoming features. 
+Fastack stores your stack in your own cloud — **GitHub**, **Dropbox**, or **Google Drive** — or fully local on disk if you don't want to sign in. Everything is optionally encrypted with a password you set. The desktop app is Electron.
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/fastack_main.PNG)
+![Fastack main view](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/fastack_main.PNG)
 
-Once a user logs in through a github portal a stack creation page is displayed where the user can name their stack and provide a password to encrypt their stack.
+## Install
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/stack_creation.PNG)
+Grab the latest installer for your platform from the [Releases page](https://github.com/ssajnani/FastackDesktop/releases):
 
-If a stack already exists and is encrypted the user will be prompted for the password.
+- **macOS**: `Fastack-<version>.dmg` (universal, x64 + arm64) or `Fastack-<version>-mac.zip`
+- **Windows**: `Fastack Setup <version>.exe` (NSIS installer)
+- **Linux**: `Fastack-<version>.AppImage` or `.deb`
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/enter_password.PNG)
+The installers are unsigned in v1. On macOS the first launch will show a Gatekeeper warning — right-click the app in Finder → **Open** → **Open**. On Windows you may need to click "More info → Run anyway" in SmartScreen.
 
-Once a stack is created the user is prompted to create a new task.
+## First-run flow
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/new_task.PNG)
+1. Launch Fastack — a menubar icon appears (top-right on macOS, bottom-right on Windows/Linux). Click it to open the popup.
+2. Choose a backend: **GitHub**, **Dropbox**, **Google**, or **Local** (no login).
+3. OAuth in a browser window (Google/GitHub) or via an external browser + paste-code flow (Dropbox). Local skips this step entirely.
+4. First-time users pick a repo/folder name (created for you). Returning users are dropped straight into their stack.
+5. Add your first task. Set duration, priority, optional dates, and markdown notes.
 
-In the creation process, only the name is a required field. There is also a notes section that allows users to enter markdown. Once the user focuses on the notes input box a display of the markdown being compiled is shown, as demonstrated below.
+Data storage layout (per backend):
 
-Unfocused:
+| Backend | Path |
+|---|---|
+| GitHub | `<repo>/<year>/<month>/<day>` (private repo recommended) |
+| Dropbox | `/Fastack-<name>/<year>/<month>/<day>` |
+| Google Drive | `Fastack-<name>/<year>/<month>/<day>` (Drive folders) |
+| Local | `<userData>/fastack-local/local/<year>/<month>/<day>` |
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/notes_closed.PNG)
+Started in Local mode and later want to sync to the cloud? Open **Settings** → **Push local stack to cloud**, type a repo/folder name, pick a target. Fastack authenticates with the target, uploads every snapshot from your local history to the equivalent path, and switches you over.
 
-Focused:
+## Shortcuts
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/notes_open.PNG)
+All navigation is keyboard-first. Defaults (customize on the Settings page):
 
-Once tasks are created they are automatically organized based on time, with overdue items having the highest priority, no date items being the next highest, then items that are due today, and finally items that are upcoming. In addition to time, items are also sorted based on priority, with values from 1 to 100. These characteristics are shown in the gif below. The gif also shows that big task names have a rollover effect to go over name information.
+| Action | Shortcut |
+|---|---|
+| Open/close popup | `Alt+Z` |
+| New task | `Alt+N` |
+| Edit task | `Alt+E` |
+| Clock in | `Alt+C` |
+| Clock out | `Alt+V` |
+| Pop top task | `Alt+P` |
+| Scroll stack up/down | `Alt+↑` / `Alt+↓` |
+| Settings | `Alt+S` |
+| Logout | `Alt+L` |
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/fastack_rollover.gif)
+## Development
 
-So far users can also clock in and clock out based on the duration provided during task creation. If no duration was provided the task will count down from 0 seconds. These features are shown in the gif below.
+Requires **Node 18+** and npm 8+.
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/clockin_clockout.gif)
+```bash
+git clone git@github.com:ssajnani/FastackDesktop.git
+cd FastackDesktop
+npm install --no-audit
+npm run dev        # runs electron with devtools open
+```
 
-All the navigation is completed using shortcuts. The key combination for these shortcuts can be dynamically updated on the settings page as shown below.
+`npm start` runs without auto-opening devtools (production-ish). Set `FASTACK_DEV=1` when you want devtools always. Set `FASTACK_LOCAL=1` to skip the login screen entirely and drop straight into Local mode — useful for fast UI iteration.
 
-![image info](https://raw.githubusercontent.com/ssajnani/FastackDesktop/master/demo/setting.gif)
+### Building installers
 
-## Upcoming Features
+```bash
+npm run pack        # unpacked .app for smoke-testing (no installer)
+npm run dist:mac    # .dmg + .zip in ./release
+npm run dist:win    # NSIS .exe in ./release (needs Wine on macOS)
+npm run dist:linux  # AppImage + .deb in ./release
+npm run dist        # current platform default
+```
 
-1) Screen analytics to measure efficiency of information gathering
-2) Typing analytics to measure efficiency of information input and increase typing speed
-3) Google Drive and Dropbox functionality
-4) Buttons: Currently everything is through shortcuts which is the intended usage but in the future add buttons for clickability
-5) Analytics on time taken to complete tasks vs predicted time to completion
+All artifacts land in `./release/`. See the `build` block in `package.json` for icon paths, target arches, and installer options.
 
-## Development Environment (tested on Windows and MacOS):
+## Architecture
 
-1) Install node 10.16.0 and npm 6.9.0
-2) Clone the repo (git clone git@github.com:ssajnani/FastackDesktop.git)
-3) Install node modules (npm i)
-4) Run the electron app (npm start)
+- `main.js` — Electron main process. Tray icon + single BrowserWindow, hides on blur, positions relative to tray.
+- `home.html` + `loginGithub.js` — landing screen with three backend buttons. Runs OAuth (PKCE for Google, standard flow for GitHub, external browser + code paste for Dropbox), then hands the access token to the platform-specific backend helper.
+- `helper/github_functions.js` / `dropbox_functions.js` / `gdrive_functions.js` — the three interchangeable backends. Each exports the same surface: `makeRepo`, `getContent`, `listFiles`, `checkFastackRepoExists`, `checkFileExists`, `createUpdateFile`.
+- `helper/prestack_functions.js` — walks the year/month/day tree to load the latest stack snapshot from whichever backend is active.
+- `helper/stack_functions.js` — pure stack ops (sort, HTML render, countdown timer for clock-in).
+- `helper/crypto_helper.js` — AES-256-CTR + PBKDF2 password-based encryption for stored stacks.
+- `stack/*.html` + matching `stack/*.js` — the actual UI screens (task list, create/edit task, settings, backend-specific "name your repo" flow).
+
+## Contributing / feedback
+
+File issues or PRs on [GitHub](https://github.com/ssajnani/FastackDesktop). MIT-licensed — see [LICENSE](./LICENSE).
